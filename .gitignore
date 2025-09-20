@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# DVC
+data/raw/*
+.dvc/cache/
+.dvc/tmp/
+
+# MLflow
+mlruns/
+
+# VS Code
+.vscode/
