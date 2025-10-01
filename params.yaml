@@ -1,0 +1,7 @@
+data:
+  path: data/raw/sample.csv
+
+tfidf_svm:
+  max_features: 5000
+  test_size: 0.2
+  random_state: 42

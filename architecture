@@ -1,0 +1,44 @@
+CallCenterAI/
+├── data/                  # Géré par DVC pour les datasets
+│   └── raw/               # Dataset brut de Kaggle
+├── models/                # Modèles sauvegardés via MLflow
+├── src/                   # Code source principal
+│   ├── data/              # Scripts de préparation des données
+│   │   └── prepare.py     # Script pour préparer le dataset
+│   ├── train/             # Scripts d'entraînement
+│   │   ├── train_tfidf_svm.py
+│   │   └── train_transformer.py
+│   ├── services/          # Services FastAPI
+│   │   ├── tfidf_svc/     # Service pour TF-IDF + SVM
+│   │   │   ├── app.py
+│   │   │   └── requirements.txt
+│   │   ├── transformer_svc/
+│   │   │   ├── app.py
+│   │   │   └── requirements.txt
+│   │   └── agent/
+│   │       ├── app.py
+│   │       ├── utils.py   # Fonctions utilitaires (scrub PII, détection langue)
+│   │       └── requirements.txt
+│   └── tests/             # Tests unitaires et d'intégration
+│       ├── test_data.py
+│       ├── test_train.py
+│       ├── test_services.py
+│       └── test_agent.py
+├── docker/                # Fichiers Docker
+│   ├── tfidf_svc.Dockerfile
+│   ├── transformer_svc.Dockerfile
+│   ├── agent.Dockerfile
+│   └── docker-compose.yml
+├── monitoring/            # Configurations monitoring
+│   ├── prometheus.yml
+│   └── grafana/           # Dashboards Grafana (JSON exportés)
+├── .github/workflows/     # CI/CD GitHub Actions
+│   └── ci-cd.yml
+├── dvc.yaml               # Pipeline DVC
+├── params.yaml            # Hyperparamètres pour DVC/MLflow
+├── requirements.txt       # Dépendances globales
+├── .gitignore             # Ignorer data/, models/, etc.
+├── .dvcignore             # Pour DVC
+├── mlflow/                # Dossier pour MLflow tracking (géré localement)
+├── README.md              # Instructions détaillées
+└── rapport_mlflow.md      # Rapport généré à partir de MLflow

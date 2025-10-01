@@ -1,4 +1,11 @@
 # src/models/tfidf_svm.py
+"""purpose of using tf-idf:
+    mesure statistique utilisée pour évaluer l'importance d'un mot dans un document par rapport à un ensemble de documents
+"""
+"""
+TF-IDF: Turns text into numbers representing word importance.
+SVM: Uses those numbers to classify text into categories.
+"""
 
 import os
 import pandas as pd
@@ -40,6 +47,7 @@ def load_dataset(csv_path: str) -> pd.DataFrame:
 # -------------------------
 # 3️⃣ Train TF-IDF + SVM
 # -------------------------
+#DataFrame (dans pandas) est une structure de données en 2 dimensions (tableau),
 def train_tfidf_svm(df: pd.DataFrame, test_size=0.2, random_state=42):
     X = df["Cleaned_Document"]
     y = df["Topic_group"]
@@ -61,6 +69,33 @@ def train_tfidf_svm(df: pd.DataFrame, test_size=0.2, random_state=42):
     # Evaluate
     y_pred = svm.predict(X_test_tfidf)
     print("Classification report:\n", classification_report(y_test, y_pred))
+
+    
+    #we can use thoose instructions to make the code more fluide, maintainable, safer and it allow probability calibration
+    """
+    # Pipeline: TF-IDF + Calibrated SVM
+    pipeline = Pipeline([
+        ("tfidf", TfidfVectorizer(max_features=params["max_features"], ngram_range=(1, 2))),
+        ("svm", CalibratedClassifierCV(LinearSVC(random_state=params["random_state"])))
+    ])
+
+    pipeline.fit(X_train, y_train)
+
+    # Evaluate
+    y_pred = pipeline.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred, average="weighted")
+    print("Classification report:\n", classification_report(y_test, y_pred))
+
+    # Log to MLflow
+    mlflow.set_tracking_uri("http://localhost:5000")  # Adjust if needed
+    mlflow.set_experiment("TFIDF_SVM")
+    with mlflow.start_run():
+        mlflow.log_params(params)
+        mlflow.log_metric("accuracy", acc)
+        mlflow.log_metric("f1_score", f1)
+        mlflow.sklearn.log_model(pipeline, "tfidf_svm_model")
+    """
 
     return tfidf, svm
 
