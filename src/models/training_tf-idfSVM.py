@@ -62,20 +62,7 @@ def train_tfidf_svm(df: pd.DataFrame, params:dict):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=params["test_size"], random_state=params["random_state"], stratify=y
     )
-    """# TF-IDF vectorizer
-    tfidf = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
-    X_train_tfidf = tfidf.fit_transform(X_train)
-    X_test_tfidf = tfidf.transform(X_test)
-
-    # Linear SVM classifier
-    svm = LinearSVC(random_state=random_state)
-    svm.fit(X_train_tfidf, y_train)
-
-    # Evaluate
-    y_pred = svm.predict(X_test_tfidf)
-    print("Classification report:\n", classification_report(y_test, y_pred))
-
-    """
+    
     #we can use thoose instructions to make the code more fluide, maintainable, safer and it allow probability calibration
     
     # Pipeline: TF-IDF + Calibrated SVM
