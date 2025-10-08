@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.metrics import classification_report
-from src.utils.data_utils import load_data, save_sample  # use your helper functions
+from src.utils.data_utils import load_data, save_sample  
 import nltk
 from nltk.corpus import stopwords
 
@@ -107,3 +107,5 @@ def save_model(tfidf, svm, output_dir="models"):
     joblib.dump(tfidf, os.path.join(output_dir, "tfidf_vectorizer.pkl"))
     joblib.dump(svm, os.path.join(output_dir, "svm_model.pkl"))
     print(f"Models saved in {output_dir}/")
+
+#Accuracy: 0.86 → 86% of tickets were correctly classified.
