@@ -49,8 +49,7 @@ def loadModel():
     """ Load model trained"""
     try:
         mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-        model = mlflow.sklearn.load_model("models:/tfidf_svm_model/Production")
-        #model = mlflow.pyfunc.load_model("models:/tfidf_svm_model/Production")
+        model = mlflow.sklearn.load_model("models:/tfidf_svm_model/2")
         logger.info("TF-IDF model loaded successfully!")
         return model
     except Exception as e:
