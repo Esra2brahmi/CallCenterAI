@@ -1,5 +1,5 @@
 data:
-  path: data/raw/sample.csv
+  path: data/raw/all_tickets_processed_improved_v3.csv
 
 tfidf_svm:
   max_features: 5000
