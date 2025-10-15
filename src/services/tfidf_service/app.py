@@ -2,118 +2,141 @@ import logging
 import os
 import re
 import string
-from fastapi import FastAPI, HTTPException, logger, requests
+from fastapi import FastAPI, HTTPException
 import joblib
-import mlflow
-from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
+import mlflow
+import requests
 from nltk.corpus import stopwords
+from prometheus_fastapi_instrumentator import Instrumentator
 
-
+# ==============================
+# ⚙️ Configuration
+# ==============================
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MODEL_NAME = os.getenv("MODEL_NAME", "tfidf_svm_model")
+LOCAL_MODEL_PATH = os.getenv("LOCAL_MODEL_PATH", "models/tfidf_svm_model.pkl")
+MODEL_STAGE = os.getenv("MODEL_STAGE", "Production")
 TRANSFORMERS_SERVICE_URL = os.getenv("TRANSFORMERS_SERVICE_URL", "http://localhost:8001/scrub_pii")
 
-app = FastAPI(title="TF-IDF SVM service")
+app = FastAPI(title="TF-IDF SVM Service", version="1.1.0")
 
-#monitor of the app : it collect all th metrics used by this fastAPI and it rturned into /metrics endpoint.
+# Monitoring Prometheus
 instrumentator = Instrumentator().instrument(app).expose(app)
 
-# Logger
+# Logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
-# Remove PII (emails, phone numbers) from text.
-def convertContact(text: str) -> str:
+# ==============================
+# 🧹 Prétraitement du texte
+# ==============================
+def convert_contact(text: str) -> str:
+    """Supprime les données personnelles (PII) via microservice ou fallback regex."""
     try:
-        response = requests.post(TRANSFORMERS_SERVICE_URL, json={"text": text})
+        response = requests.post(TRANSFORMERS_SERVICE_URL, json={"text": text}, timeout=3)
         response.raise_for_status()
-        return response.json()["scrubbed_text"]
+        return response.json().get("scrubbed_text", text)
     except Exception as e:
-        logger.warning(f"Échec appel transformers: {e}. Fallback sur regex.")
-        # Regex fallback (votre code original)
-        text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', text)
-        text = re.sub(r'\b(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b', '[PHONE]', text)
+        logger.warning(f"[Fallback] Échec appel Transformers : {e}")
+        # Regex fallback
+        text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", text)
+        text = re.sub(r"\b(?:\+?\d{1,3})?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b", "[PHONE]", text)
         return text
 
-def cleanText(text:str)->str:
-    stopWords = set(stopwords.words("english"))
+def clean_text(text: str) -> str:
+    """Nettoyage du texte : lower, remove punctuation, digits, stopwords."""
     if not isinstance(text, str):
         return ""
     text = text.lower()
     text = text.translate(str.maketrans("", "", string.punctuation))
     text = re.sub(r"\d+", "", text)
-    words = [w for w in text.split() if w not in stopWords]
+    stop_words = set(stopwords.words("english"))
+    words = [w for w in text.split() if w not in stop_words]
     return " ".join(words)
 
-def loadModel():
-    """ Load model trained"""
+# ==============================
+# 🔄 Chargement du modèle MLflow
+# ==============================
+def load_model():
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    logger.info(f"Connexion MLflow OK : {MLFLOW_TRACKING_URI}")
+    client = mlflow.MlflowClient()
+    
     try:
-        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-        model = mlflow.sklearn.load_model("models:/tfidf_svm_model/Production")
-        #model = mlflow.pyfunc.load_model("models:/tfidf_svm_model/Production")
-        logger.info("TF-IDF model loaded successfully!")
-        return model
+        # Récupère la dernière version loggée du modèle
+        latest_versions = client.get_latest_versions(MODEL_NAME)
+        if latest_versions:
+            latest_version = latest_versions[0].version
+            logger.info(f"📦 Chargement du modèle '{MODEL_NAME}' version {latest_version} depuis MLflow")
+            model = mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/{latest_version}")
+            return model
+        else:
+            raise ValueError(f"Aucune version trouvée pour le modèle '{MODEL_NAME}'")
     except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        raise RuntimeError("Failed to load model from MLflow")
-    
-    
+        logger.warning(f"[Fallback] Impossible de charger depuis MLflow : {e}")
+        # Fallback : charger depuis le fichier local
+        if os.path.exists(LOCAL_MODEL_PATH):
+            logger.info(f"Chargement du modèle depuis fichier local : {LOCAL_MODEL_PATH}")
+            model = joblib.load(LOCAL_MODEL_PATH)
+            return model
+        else:
+            logger.error("❌ Modèle introuvable ni dans MLflow ni localement.")
+            raise RuntimeError("Impossible de charger le modèle TF-IDF")
 
-model = loadModel()
+model = load_model()
 
-
+# ==============================
+# 📦 Schémas de requête/réponse
+# ==============================
 class PredictionRequest(BaseModel):
-    text:str
+    text: str
 
 class PredictionResponse(BaseModel):
-    label:str
-    probability:dict
-    convertText: str
+    label: str
+    probability: dict
+    cleaned_text: str
+    converted_text: str
 
-"""Prediction end point"""
+# ==============================
+# 🔮 Endpoint /predict
+# ==============================
 @app.post("/predict", response_model=PredictionResponse)
-def predict(request:PredictionRequest):
-    if not request.text :
-        logger.error("text is required")
-        raise HTTPException(status=400, detail="text is required!")
-    
+def predict(request: PredictionRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text is required")
+
     try:
-        #convert contact and clean texts:
-        convertedText = convertContact(request.text)
-        cleanedText = cleanText(convertedText)
-        # text_exemple: I love this product!
-        #predict class probabilities
-        class_probability = model.predict_proba([cleanedText])[0]   #probs = [0.2, 0.8]
-        print(f"{class_probability}")
-        #Determines the predicted label by selecting the class with the highest probability.
-        #classes = ['negative', 'positive']
-        class_label = model.classes_[class_probability.argmax()] 
-        print(f"{class_label}")
-        #Converts probabilities to a dictionary mapping class names to their probabilities.
-        probabilities = {cls: float(prob) for cls, prob in zip(model.classes_, class_probability)}  #probabilities = {"negative": 0.2, "positive": 0.8}
-        """
-        result: { "label": "positive", "probabilities": {"negative": 0.2,"positive": 0.8}}
-        """
+        converted_text = convert_contact(request.text)
+        cleaned_text = clean_text(converted_text)
+
+        class_probs = model.predict_proba([cleaned_text])[0]
+        class_label = model.classes_[class_probs.argmax()]
+        probs_dict = {cls: float(prob) for cls, prob in zip(model.classes_, class_probs)}
+
+        logger.info(f"[Prediction] label={class_label}, probs={probs_dict}")
+
         return PredictionResponse(
             label=class_label,
-            probability=probabilities,
-            convertText=convertedText
+            probability=probs_dict,
+            cleaned_text=cleaned_text,
+            converted_text=converted_text
         )
+
     except Exception as e:
-        logger.error(f"prediction error: {str (e)}")
-        raise HTTPException(status_code=500, detail="prediction failed!")
-    
+        logger.exception("Erreur pendant la prédiction")
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
-    
-
+# ==============================
+# ❤️ Health Check
+# ==============================
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "model": MODEL_NAME, "stage": MODEL_STAGE}
 
-
-"""pipeline = joblib.load("models/tf_idf_svm_model.pkl")
-test_text = "mail please dear looks blacklisted receiving mails anymore sample attached thanks kind regards senior engineer" 
-prediction = pipeline.predict([test_text])
-probs = pipeline.predict_proba([test_text])[0]
-print(f"Predicted label: {prediction[0]}")
-print(f"Probabilities: {probs}")"""
+# ==============================
+# 🧭 Root
+# ==============================
+@app.get("/")
+def home():
+    return {"message": "Bienvenue sur le service TF-IDF + SVM 🚀", "version": "1.1.0"}
