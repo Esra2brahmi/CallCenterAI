@@ -79,40 +79,38 @@ def train_tfidf_svm(df: pd.DataFrame, params: dict):
     y = df["Topic_group"]
 
     # Split into train/test
-    #mlflow.autolog()
-
-    
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=params["test_size"], random_state=params["random_state"], stratify=y
     )
 
-    mlflow.set_tracking_uri("http://localhost:5000")
+    mlflow.set_tracking_uri("file:./mlruns")
 
-    # 🔄 Check for existing experiment using search_experiments
+    # Check for existing experiment
     experiment_name = "TFIDF_SVM"
     experiments = mlflow.search_experiments(filter_string=f"name = '{experiment_name}'")
 
     if experiments:
-        # Experiment exists, use its ID
         experiment_id = experiments[0].experiment_id
         print(f"Found existing experiment '{experiment_name}' with ID: {experiment_id}")
     else:
-        # Create new experiment if it doesn't exist
         experiment_id = mlflow.create_experiment(experiment_name)
         print(f"Created new experiment '{experiment_name}' with ID: {experiment_id}")
 
-    mlflow.set_experiment("TFIDF_SVM")
+    mlflow.set_experiment(experiment_name)
 
+    # Parent run for general params
     with mlflow.start_run(run_name="tfidf_svm_parent_run") as parent_run:
-        """mlflow.sklearn.autolog()  # Auto-log parameters, metrics, and models"""
-        mlflow.log_params("parent_run_type", "TF-IDF_SVM_training")
+        mlflow.log_param("parent_run_type", "TF-IDF_SVM_training")
+        # Log only params that are not max_features
+        for k, v in params.items():
+            if k != "max_features":
+                mlflow.log_param(k, v)
 
         max_features_values = [5000, 10000, 15000]
         for max_features in max_features_values:
             with mlflow.start_run(run_name=f"child_run_max_features_{max_features}", nested=True):
-                # Log paramètres spécifiques du child run
+                # Log only max_features for child run
                 mlflow.log_param("max_features", max_features)
-                mlflow.log_params(params)
 
                 # Pipeline: TF-IDF + Calibrated SVM
                 pipeline = Pipeline([
@@ -139,6 +137,7 @@ def train_tfidf_svm(df: pd.DataFrame, params: dict):
                 print("Classification report:\n", classification_report(y_test, y_pred))
 
     return pipeline
+
 
 # -------------------------
 # 5️⃣ Save models
