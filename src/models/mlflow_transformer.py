@@ -1,137 +1,125 @@
 import os
+import sys
 import mlflow
 import mlflow.pyfunc
-from mlflow.tracking import MlflowClient
 import torch
 import joblib
-import numpy as np
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import accuracy_score, f1_score
 
 # -----------------------------
-# Paths
+# CONFIG
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.abspath(os.path.join(BASE_DIR, "../../models/transformer_model"))
-TEST_FILE = os.path.abspath(os.path.join(BASE_DIR, "../../data/processed/sample.csv"))
+MODEL_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../models/transformer_model"))
+RUN_NAME = "transformer_model_run"
+
+print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
+print(f"[DEBUG] MODEL_DIR: {MODEL_DIR}")
 
 # -----------------------------
-# Device
+# SAFETY CHECKS
 # -----------------------------
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+required_files = [
+    "config.json",
+    "model.safetensors",
+    "tokenizer_config.json",
+    "tokenizer.json",
+    "vocab.txt",
+    "special_tokens_map.json",
+    "label_encoder.pkl",
+]
+missing = [f for f in required_files if not os.path.exists(os.path.join(MODEL_DIR, f))]
+if missing:
+    print(f"[ERROR] Missing files in model directory: {missing}")
+    sys.exit(1)
+
+print("[DEBUG] All model files found ✅")
 
 # -----------------------------
-# Load model, tokenizer, label encoder
-# -----------------------------
-print("Loading model and tokenizer...")
-model = AutoModelForSequenceClassification.from_pretrained(
-    MODEL_PATH, local_files_only=True, trust_remote_code=False
-)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
-le = joblib.load(os.path.join(MODEL_PATH, "label_encoder.pkl"))
-
-model.to(DEVICE)
-model.eval()
-print(f"✅ Model loaded on {DEVICE}")
-
-# -----------------------------
-# MLflow wrapper
+# DEFINE CUSTOM PYFUNC MODEL
 # -----------------------------
 class TransformerWrapper(mlflow.pyfunc.PythonModel):
-    def load_context(self, context):
-        self.model = model
-        self.tokenizer = tokenizer
-        self.le = le
-        self.device = DEVICE
+    def load_context(self, artifacts_path=None):
+        try:
+            print("[DEBUG] Loading model artifacts inside pyfunc context...")
+            model_path = artifacts_path if artifacts_path else self.artifacts["transformer_model"]
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            self.label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
+            self.model.eval()
+            print("[DEBUG] Model + Tokenizer + LabelEncoder loaded successfully ✅")
+        except Exception as e:
+            print(f"[ERROR] Failed during load_context(): {e}")
+            raise e
 
-    def predict(self, context, model_input):
-        texts = model_input["text"].tolist()
-        inputs = self.tokenizer(
-            texts,
-            return_tensors="pt",
-            truncation=True,
-            padding=True,
-            max_length=128
-        )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        with torch.no_grad():
-            logits = self.model(**inputs).logits
-        preds = np.argmax(logits.cpu().numpy(), axis=1)
-        return self.le.inverse_transform(preds)
-
-# -----------------------------
-# Evaluate on test set (optional)
-# -----------------------------
-if os.path.exists(TEST_FILE):
-    test_df = pd.read_csv(TEST_FILE)
-
-    # fix column names
-    if "Document" not in test_df.columns or "Topic_group" not in test_df.columns:
-        raise ValueError("CSV must have 'Document' and 'Topic_group' columns")
-    
-    wrapper = TransformerWrapper()
-    wrapper.load_context(None)
-
-    # rename for wrapper
-    test_df_renamed = test_df.rename(columns={"Document": "text"})
-    y_true = test_df["Topic_group"].tolist()
-    y_pred = wrapper.predict(None, test_df_renamed)
-
-    acc = float(accuracy_score(y_true, y_pred))
-    f1 = float(f1_score(y_true, y_pred, average="weighted"))
-    print(f"✅ Test metrics -> Accuracy: {acc:.4f}, F1: {f1:.4f}")
-else:
-    acc = 0.8815
-    f1 = 0.8815
+    def predict(self, context, model_input: pd.DataFrame):
+        try:
+            texts = model_input["text"].tolist()
+            print(f"[DEBUG] Predict called with {len(texts)} texts")
+            inputs = self.tokenizer(
+                texts, padding=True, truncation=True, return_tensors="pt", max_length=128
+            )
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                preds = torch.argmax(outputs.logits, dim=1).numpy()
+            labels = self.label_encoder.inverse_transform(preds)
+            return labels
+        except Exception as e:
+            print(f"[ERROR] Prediction failed: {e}")
+            raise e
 
 # -----------------------------
-# MLflow logging
+# LOG MODEL TO MLFLOW
 # -----------------------------
-mlflow.set_experiment("CallCenterAI_Transformer")
+if __name__ == "__main__":
+    try:
+        mlflow.set_tracking_uri("http://127.0.0.1:5000")
+        mlflow.set_experiment("Transformer_Models")
 
-with mlflow.start_run(run_name="Transformer_Logged_Run"):
-    mlflow.log_param("model_name", "distilbert-base-multilingual-cased")
-    mlflow.log_param("max_length", 128)
-    mlflow.log_param("epochs", 3)
-    mlflow.log_param("batch_size", 16)
-    mlflow.log_param("learning_rate", 5e-5)
+        print("[DEBUG] Starting MLflow run...")
+        with mlflow.start_run(run_name=RUN_NAME) as run:
+            print(f"[DEBUG] Active run id: {run.info.run_id}")
 
-    # Log metrics as simple floats
-    mlflow.log_metric("accuracy", acc)
-    mlflow.log_metric("f1_weighted", f1)
+            # Example input for signature inference
+            example = pd.DataFrame({"text": ["example ticket about billing problem"]})
 
-    # Log extra metrics from training/eval
-    metrics_to_log = {
-        "train_loss": 0.3721,
-        "val_loss": 0.3975,
-        "train_runtime": 1196.5,
-        "samples_per_second": 95.95,
-        "steps_per_second": 2.999,
-        "total_flos": 3.8e15,
-        "epoch": 3
-    }
+            # Load test CSV and rename columns if needed
+            test_csv_path = os.path.abspath(os.path.join(BASE_DIR, "../../data/processed/sample.csv"))
+            if os.path.exists(test_csv_path):
+                print(f"[DEBUG] Found test data: {test_csv_path}")
+                test_df = pd.read_csv(test_csv_path)
+                # Rename CSV columns to match model input
+                if "Document" in test_df.columns and "Topic_group" in test_df.columns:
+                    test_df = test_df.rename(columns={"Document": "text", "Topic_group": "label"})
+                    print("[DEBUG] Renaming columns: Document → text, Topic_group → label")
 
-    # Log model
-    mlflow.pyfunc.log_model(
-        name="transformer_model",
-        python_model=TransformerWrapper(),
-        artifacts={
-            "tokenizer": MODEL_PATH,
-            "label_encoder": os.path.join(MODEL_PATH, "label_encoder.pkl")
-        }
-    )
+                    wrapper = TransformerWrapper()
+                    wrapper.load_context(artifacts_path=MODEL_DIR)
 
-    run_id = mlflow.active_run().info.run_id
-    print(f"✅ MLflow run completed with ID: {run_id}")
+                    preds = wrapper.predict(None, test_df[["text"]])
+                    acc = accuracy_score(test_df["label"], preds)
+                    f1 = f1_score(test_df["label"], preds, average="weighted")
+                    mlflow.log_metric("accuracy", acc)
+                    mlflow.log_metric("f1_score", f1)
+                    print(f"[DEBUG] Metrics logged → accuracy={acc:.3f}, f1={f1:.3f}")
+                else:
+                    print("[WARNING] Test CSV missing required columns (Document, Topic_group)")
+            else:
+                print("[INFO] No test CSV found — skipping metric logging.")
 
-# -----------------------------
-# Register model in MLflow
-# -----------------------------
-client = MlflowClient()
-result = mlflow.register_model(
-    f"runs:/{run_id}/transformer_model",
-    "CallCenterAI_Transformer_Model"
-)
+            print("[DEBUG] Logging pyfunc model to MLflow...")
+            mlflow.pyfunc.log_model(
+                artifact_path="transformer_model",
+                python_model=TransformerWrapper(),
+                artifacts={"transformer_model": MODEL_DIR},
+                input_example=example,
+            )
 
-print(f"✅ Model registered in MLflow as version {result.version}")
+            print(f"[SUCCESS] Model logged successfully ✅")
+            print(f"View in MLflow UI → http://127.0.0.1:5000/#/experiments")
+
+    except Exception as e:
+        print(f"[FATAL ERROR] Something went wrong during MLflow logging: {e}")
+        raise e
