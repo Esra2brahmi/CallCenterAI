@@ -1,0 +1,18 @@
+schema: '2.0'
+stages:
+  train_tfidf:
+    cmd: python src/models/mlflow_tfidf.py
+    deps:
+    - path: data/raw/all_tickets_processed_improved_v3.csv
+      hash: md5
+      md5: 0dfa553dd2830973c23759be9f3f77d2
+      size: 14569268
+    - path: src/models/mlflow_tfidf.py
+      hash: md5
+      md5: eb32055679a48459dda4b5ec2f2a7cb8
+      size: 4356
+    outs:
+    - path: models/tfidf_svm_model.pkl
+      hash: md5
+      md5: 5eb7d59ed9692044469d223467da1a4b
+      size: 2896032

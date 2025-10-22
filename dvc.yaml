@@ -1,0 +1,22 @@
+#Dans un projet ML, tu as souvent :
+#des datasets volumineux (impossible à stocker dans Git),
+#plusieurs versions d’entraînement (différents hyperparamètres, modèles…),
+#des pipelines complexes (préparation → entraînement → évaluation).
+#DVC te permet de :
+#suivre les modifications sur les données et modèles,
+#reproduire exactement un pipeline ML,
+#partager les résultats d’expériences avec ton équipe,
+#lier Git et le stockage cloud/local pour les gros fichiers (ex : Google Drive, S3, etc.).
+
+# installation de dvc: pip install dvc
+# initialisation du projet dvc: dvc init -f
+# execution d'une étape du pipeline: dvc repro
+
+stages:  #est la racine du fichier dvc.yaml: ce qui suit sont les étapes du pipeline
+  train_tfidf: #nom de l'étape
+    cmd: python src/models/mlflow_tfidf.py
+    deps: #dépendances de l'étape
+      - data/raw/all_tickets_processed_improved_v3.csv
+      - src/models/mlflow_tfidf.py
+    outs:
+      - models/tfidf_svm_model.pkl  # Modèle entraîné
