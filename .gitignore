@@ -16,3 +16,5 @@ mlruns/
 
 # VS Code
 .vscode/
+src/models/mlflow_logged_model/pyfunc_model/python_model.pkl
+mlartifacts/
