@@ -20,3 +20,5 @@ src/models/mlflow_logged_model/pyfunc_model/python_model.pkl
 mlartifacts/
 mlartifacts/
 src/models/mlflow_logged_model/pyfunc_model/artifacts/mlflow_logged_model/pyfunc_model/python_model.pkl
+
+.env

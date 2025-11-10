@@ -9,6 +9,8 @@ from typing import List, Dict
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import joblib
+import os
+import glob
 
 # ==============================
 # Logging setup
@@ -53,7 +55,62 @@ model = None
 tokenizer = None
 le = None  # Label encoder
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = "/home/esra/CallCenterAI/mlartifacts/338694710983446370/models/m-df0ef1bdbfc0405f892fe256170b9336/artifacts/artifacts/transformer_model"
+
+
+MLARTIFACTS_DIR = os.getenv(
+    "MLARTIFACTS_DIR",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mlartifacts")),
+)
+
+
+def _find_transformer_model_candidates(root_dir: str):
+    candidates = []
+    if not os.path.isdir(root_dir):
+        return candidates
+
+    # Iterate over run folders under mlartifacts
+    for run_dir in glob.glob(os.path.join(root_dir, "*")):
+        models_dir = os.path.join(run_dir, "models")
+        if not os.path.isdir(models_dir):
+            continue
+        # Each model folder may be named m-<id>
+        for model_sub in glob.glob(os.path.join(models_dir, "m-*")):
+            # Expected transformer artifact path inside mlflow layout
+            candidate = os.path.join(model_sub, "artifacts", "artifacts", "transformer_model")
+            if os.path.isdir(candidate):
+                candidates.append(candidate)
+
+    return candidates
+
+
+def _select_latest_candidate(candidates):
+    if not candidates:
+        return None
+    # Choose by directory modification time (most recent first)
+    candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+    return candidates[0]
+
+
+# Allow explicit override
+MODEL_PATH = os.getenv("MODEL_PATH")
+if not MODEL_PATH:
+    candidates = _find_transformer_model_candidates(MLARTIFACTS_DIR)
+    chosen = _select_latest_candidate(candidates)
+    if chosen:
+        MODEL_PATH = chosen
+    else:
+        # Fallback: look for a repository-level `models/transformer_model`
+        fallback = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "models", "transformer_model"))
+        if os.path.isdir(fallback):
+            MODEL_PATH = fallback
+        else:
+            raise RuntimeError(
+                f"Could not locate transformer model. Searched MLARTIFACTS_DIR={MLARTIFACTS_DIR} for candidates. "
+                "Set MODEL_PATH env var to point to the transformer model directory."
+            )
+
+MODEL_PATH = os.path.abspath(MODEL_PATH)
+logger.info(f"Resolved MODEL_PATH = {MODEL_PATH}")
 
 # ==============================
 # Schemas
