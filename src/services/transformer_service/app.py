@@ -1,65 +1,96 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
-from pydantic import BaseModel
-import uvicorn
+# src/services/transformer_service/serviceFromMLFlow.py
 import logging
-import time
-from typing import List, Dict
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import joblib
 import os
-import glob
+import re
+import string
+from typing import Dict
 
-# ==============================
-# Logging setup
-# ==============================
-logging.basicConfig(level=logging.INFO)
+import requests
+from fastapi import FastAPI, HTTPException
+import mlflow
+import pandas as pd
+from prometheus_fastapi_instrumentator import Instrumentator
+from nltk.corpus import stopwords
+from pydantic import BaseModel
+import torch
+import uvicorn
+
+# -----------------------------
+# CONFIG
+# -----------------------------
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MODEL_NAME = os.getenv("MODEL_NAME", "CallCenterTransformer")
+TRANSFORMERS_SERVICE_URL = os.getenv("TRANSFORMERS_SERVICE_URL", "http://localhost:8001/scrub_pii")
+
+app = FastAPI(title="TRANSFORMERS Service", version="1.1.0")
+instrumentator = Instrumentator().instrument(app).expose(app)
 logger = logging.getLogger(__name__)
 
-# ==============================
-# Prometheus metrics
-# ==============================
-registry = CollectorRegistry()
-REQUEST_COUNT = Counter(
-    'transformer_requests_total',
-    'Total number of requests to transformer service',
-    registry=registry
-)
-REQUEST_LATENCY = Histogram(
-    'transformer_request_latency_seconds',
-    'Request latency in seconds',
-    registry=registry
-)
-PREDICTION_COUNT = Counter(
-    'transformer_predictions_total',
-    'Total predictions made',
-    ['predicted_class'],
-    registry=registry
-)
+# -----------------------------
+# TEXT CLEANING
+# -----------------------------
+try:
+    STOP_WORDS = set(stopwords.words("english"))
+except LookupError:
+    import nltk
+    nltk.download('stopwords')
+    STOP_WORDS = set(stopwords.words("english"))
 
-# ==============================
-# FastAPI app
-# ==============================
-app = FastAPI(
-    title="Transformer Service",
-    description="Ticket classification using fine-tuned Transformer model",
-    version="1.0.0"
-)
+def convert_contact(text: str) -> str:
+    try:
+        response = requests.post(TRANSFORMERS_SERVICE_URL, json={"text": text}, timeout=3)
+        response.raise_for_status()
+        return response.json().get("scrubbed_text", text)
+    except Exception as e:
+        logger.warning(f"[PII Fallback] Transformers service failed: {e}")
+        text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", text)
+        text = re.sub(r"\b(?:\+?\d{1,3})?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b", "[PHONE]", text)
+        return text
 
-# ==============================
-# Globals
-# ==============================
-model = None
-tokenizer = None
-le = None  # Label encoder
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = "mlartifacts/transformer_model"
+def clean_text(text: str) -> str:
+    if not isinstance(text, str) or not text.strip():
+        return ""
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    text = re.sub(r"\d+", "", text)
+    words = [w for w in text.split() if w not in STOP_WORDS]
+    return " ".join(words)
 
-# ==============================
-# Schemas
-# ==============================
+# -----------------------------
+# LOAD MODEL FROM MLFLOW
+# -----------------------------
+def load_transformer_model():
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    logger.info(f"Connecting to MLflow: {MLFLOW_TRACKING_URI}")
+    client = mlflow.MlflowClient()
+
+    try:
+        exp = client.get_experiment_by_name("Transformer_Models")
+        if not exp:
+            raise ValueError("Experiment 'Transformer_Models' not found!")
+
+        latest_versions = client.get_latest_versions(name=MODEL_NAME, stages=["None", "Staging", "Production"])
+        if not latest_versions:
+            raise ValueError(f"No versions found for model '{MODEL_NAME}'")
+
+        version = latest_versions[0].version
+        logger.info(f"Loading model '{MODEL_NAME}' version {version}")
+
+        model_uri = f"models:/{MODEL_NAME}/{version}"
+        model = mlflow.pyfunc.load_model(model_uri)
+        logger.info(f"Model loaded successfully: {MODEL_NAME} v{version}")
+        return model, version
+
+    except Exception as e:
+        logger.error(f"Failed to load model '{MODEL_NAME}': {e}")
+        raise RuntimeError(f"Could not load model: {e}")
+
+# Load model at startup
+model, latest_version = load_transformer_model()
+
+# -----------------------------
+# API MODELS
+# -----------------------------
 class PredictRequest(BaseModel):
     text: str
 
@@ -68,169 +99,66 @@ class PredictResponse(BaseModel):
     confidence: float
     probabilities: Dict[str, float]
     model_used: str = "transformer"
+    model_version: str
 
-# ==============================
-# Startup event
-# ==============================
-@app.on_event("startup")
-async def load_model():
-    global model, tokenizer, le
-
-    try:
-        logger.info("Loading transformer model and tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-        model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
-        model.to(device)
-        model.eval()
-
-        # ✅ Load label encoder saved during training
-        le = joblib.load(f"{MODEL_PATH}/label_encoder.pkl")
-        labels = list(le.classes_)
-
-        # ✅ Update model.id2label to match training
-        model.config.id2label = {i: label for i, label in enumerate(labels)}
-
-        logger.info(f"Model loaded successfully on device: {device}")
-        logger.info(f"Labels: {labels}")
-
-    except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        raise
-
-# ==============================
-# Endpoints
-# ==============================
-@app.get("/label_mapping")
-async def label_mapping():
-    if model is None or le is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    mapping = {i: model.config.id2label[i] for i in range(model.config.num_labels)}
-    return mapping
-
-@app.get("/")
-async def root():
-    return {
-        "service": "Transformer Service",
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "device": str(device),
-    }
-
-@app.get("/health")
-async def health():
-    if model is None or tokenizer is None or le is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    return {
-        "status": "healthy",
-        "model": "loaded",
-        "device": str(device),
-        "classes": [model.config.id2label[i] for i in range(model.config.num_labels)],
-    }
-
+# -----------------------------
+# ENDPOINTS
+# -----------------------------
 @app.post("/predict", response_model=PredictResponse)
 async def predict(request: PredictRequest):
-    start_time = time.time()
-    REQUEST_COUNT.inc()
+    original_text = request.text.strip()
+    if not original_text:
+        raise HTTPException(status_code=400, detail="Input text is empty")
 
-    if model is None or tokenizer is None or le is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    if not request.text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    scrubbed_text = convert_contact(original_text)
+    clean_text_str = clean_text(scrubbed_text)
 
+    if not clean_text_str:
+        raise HTTPException(status_code=400, detail="Input text is empty after cleaning")
+
+    df = pd.DataFrame([clean_text_str], columns=["text"])
+    predicted_label = model.predict(df)[0]
+
+    # Extract probabilities
     try:
-        inputs = tokenizer(
-            request.text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512,
-            padding=True
-        )
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-
+        hf_model = model._model_impl.python_model.model
+        tokenizer = model._model_impl.python_model.tokenizer
+        inputs = tokenizer(clean_text_str, return_tensors="pt", truncation=True, padding=True, max_length=512)
         with torch.no_grad():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=-1)
-
-        predicted_idx = torch.argmax(probs, dim=-1).item()
-        predicted_label = le.inverse_transform([predicted_idx])[0]
-        confidence = float(probs[0][predicted_idx])
-        probabilities = {le.inverse_transform([i])[0]: float(probs[0][i]) for i in range(model.config.num_labels)}
-        probabilities = dict(sorted(probabilities.items(), key=lambda x: x[1], reverse=True))
-
-        PREDICTION_COUNT.labels(predicted_class=predicted_label).inc()
-        REQUEST_LATENCY.observe(time.time() - start_time)
-
-        return PredictResponse(
-            prediction=predicted_label,
-            confidence=confidence,
-            probabilities=probabilities
-        )
-
+            outputs = hf_model(**inputs)
+            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()[0]
+        label_encoder = model._model_impl.python_model.label_encoder
+        labels = label_encoder.classes_
+        probabilities = {str(label): float(prob) for label, prob in zip(labels, probs)}
+        confidence = float(probs.max())
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Could not extract probabilities: {e}")
+        probabilities = {}
+        confidence = 1.0
 
-@app.post("/batch_predict")
-async def batch_predict(texts: List[str]):
-    REQUEST_COUNT.inc()
-    if model is None or tokenizer is None or le is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    if not texts:
-        raise HTTPException(status_code=400, detail="Text list cannot be empty")
-
-    results = []
-    for text in texts:
-        inputs = tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512,
-            padding=True
-        )
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            probs = torch.softmax(logits, dim=-1)
-
-        predicted_idx = torch.argmax(probs, dim=-1).item()
-        predicted_label = le.inverse_transform([predicted_idx])[0]
-        confidence = float(probs[0][predicted_idx])
-
-        results.append({
-            "text": text[:100] + "..." if len(text) > 100 else text,
-            "prediction": predicted_label,
-            "confidence": confidence
-        })
-
-        PREDICTION_COUNT.labels(predicted_class=predicted_label).inc()
-
-    return {"predictions": results}
-
-@app.get("/metrics")
-async def metrics():
-    return JSONResponse(
-        content=generate_latest(registry).decode("utf-8"),
-        media_type=CONTENT_TYPE_LATEST
+    return PredictResponse(
+        prediction=str(predicted_label),
+        confidence=confidence,
+        probabilities=probabilities,
+        model_version=str(latest_version)
     )
 
-@app.get("/model_info")
-async def model_info():
-    if model is None or le is None:
-        raise HTTPException(status_code=503, detail="Model not loaded")
+@app.get("/health")
+def health():
+    return {"status": "healthy", "model": MODEL_NAME, "version": latest_version}
+
+@app.get("/")
+def root():
     return {
-        "model_type": "Transformer (HuggingFace)",
-        "model_name": model.config.name_or_path if hasattr(model, "config") else "unknown",
-        "num_classes": model.config.num_labels,
-        "classes": [model.config.id2label[i] for i in range(model.config.num_labels)],
-        "device": str(device),
-        "max_length": 512
+        "service": "TRANSFORMERS Service",
+        "version": "1.1.0",
+        "model": MODEL_NAME,
+        "model_version": latest_version,
+        "docs": "/docs"
     }
 
-# ==============================
-# Run app
-# ==============================
+# -----------------------------
+# RUN
+# -----------------------------
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("serviceFromMLFlow:app", host="0.0.0.0", port=8000, reload=False)
