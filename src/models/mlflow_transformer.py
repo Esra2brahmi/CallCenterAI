@@ -7,6 +7,7 @@ import joblib
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from sklearn.metrics import accuracy_score, f1_score
+from mlflow.pyfunc import PythonModelContext
 
 # -----------------------------
 # CONFIG
@@ -41,10 +42,14 @@ print("[DEBUG] All model files found ✅")
 # DEFINE CUSTOM PYFUNC MODEL
 # -----------------------------
 class TransformerWrapper(mlflow.pyfunc.PythonModel):
-    def load_context(self, artifacts_path=None):
+    # ---------------------------------------
+        #Charger un modèle MLflow en production
+    # ---------------------------------------
+    # j'ai remplaceé artifact_path=None (chemin obsolète) par load_context(self, context: PythonModelContext) (contienne des instruction qui vont automatiquement charger les artefacts depuis leurs emplacements MLflow corrects):
+    def load_context(self, context: PythonModelContext):
         try:
             print("[DEBUG] Loading model artifacts inside pyfunc context...")
-            model_path = artifacts_path if artifacts_path else self.artifacts["transformer_model"]
+            model_path = context.artifacts["transformer_model"]   # coorectio: context.artifacts aulieu de artifacts_path if artifacts_path else self.artifacts["transformer_model"]
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
             self.label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
@@ -63,9 +68,10 @@ class TransformerWrapper(mlflow.pyfunc.PythonModel):
             )
             with torch.no_grad():
                 outputs = self.model(**inputs)
-                preds = torch.argmax(outputs.logits, dim=1).numpy()
+                #cpu: on met le modèle dans la mémoire du processeur (RAM). Il sert à le rendre utilisable et enregistrable sur n’importe quelle machine, même sans GPU.
+                preds = torch.argmax(outputs.logits, dim=1).cpu().numpy()   #numpy to seul a un risque d’erreur si on a qu’un seul échantillon & risque de crash + incompatibilité avec MLflow donc on ajoute cpu
             labels = self.label_encoder.inverse_transform(preds)
-            return labels
+            return labels.tolist()
         except Exception as e:
             print(f"[ERROR] Prediction failed: {e}")
             raise e
@@ -95,8 +101,9 @@ if __name__ == "__main__":
                     test_df = test_df.rename(columns={"Document": "text", "Topic_group": "label"})
                     print("[DEBUG] Renaming columns: Document → text, Topic_group → label")
 
+                    fake_context = PythonModelContext(artifacts={"transformer_model": MODEL_DIR}, model_config={}) #ajouté pour test signature
                     wrapper = TransformerWrapper()
-                    wrapper.load_context(artifacts_path=MODEL_DIR)
+                    wrapper.load_context(fake_context) #aulieu de wrapper.load_context(artifacts_path=MODEL_DIR) car on utilise le contexte simulé, pas un chemin direct
 
                     preds = wrapper.predict(None, test_df[["text"]])
                     acc = accuracy_score(test_df["label"], preds)
@@ -109,13 +116,25 @@ if __name__ == "__main__":
             else:
                 print("[INFO] No test CSV found — skipping metric logging.")
 
+            #ajouté
+            fake_context = PythonModelContext(artifacts={"transformer_model": MODEL_DIR}, model_config={})
+            sig_wrapper = TransformerWrapper()
+            sig_wrapper.load_context(fake_context)
+            example_output = sig_wrapper.predict(None, example)
+            signature = mlflow.models.infer_signature(example, example_output)
+
             print("[DEBUG] Logging pyfunc model to MLflow...")
             mlflow.pyfunc.log_model(
                 artifact_path="transformer_model",
                 python_model=TransformerWrapper(),
                 artifacts={"transformer_model": MODEL_DIR},
                 input_example=example,
+                signature=signature,
+                registered_model_name="CallCenterTransformer"
+                
             )
+
+            
 
             print(f"[SUCCESS] Model logged successfully ✅")
             print(f"View in MLflow UI → http://127.0.0.1:5000/#/experiments")

@@ -53,7 +53,7 @@ model = None
 tokenizer = None
 le = None  # Label encoder
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_PATH = "/home/esra/CallCenterAI/mlartifacts/338694710983446370/models/m-df0ef1bdbfc0405f892fe256170b9336/artifacts/artifacts/transformer_model"
+MODEL_PATH = "mlartifacts/transformer_model"
 
 # ==============================
 # Schemas
@@ -231,4 +231,4 @@ async def model_info():
 # Run app
 # ==============================
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=False)
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
