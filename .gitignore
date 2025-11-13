@@ -12,11 +12,17 @@ data/raw/*
 .dvc/tmp/
 
 # MLflow
+
 mlruns/
+mlartifacts/
+!mlartifacts/
+!mlartifacts/transformer_model/
+!mlartifacts/transformer_model/**
 
 # VS Code
 .vscode/
 src/models/mlflow_logged_model/pyfunc_model/python_model.pkl
-mlartifacts/
-mlartifacts/
+
+
+#mlartifacts/
 src/models/mlflow_logged_model/pyfunc_model/artifacts/mlflow_logged_model/pyfunc_model/python_model.pkl

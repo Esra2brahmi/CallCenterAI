@@ -1,0 +1,42 @@
+version: "3.9"  # version recommandée du schéma Compose
+
+services:
+  agentservice:
+    build:
+      context: ./agentservice
+      dockerfile: Dockerfile
+    container_name: agentservice
+    ports:
+      - "8000:8000"   # accès externe à l'API agent
+    depends_on:
+      - transformersservice
+      - tfidf_svc
+    environment:
+      - TRANSFORMERS_URL=http://transformersservice:5000
+      - TFIDF_URL=http://tfidf_svc:6000
+    networks:
+      - mlops-net
+
+  transformersservice:
+    build:
+      context: ./transformersservice
+      dockerfile: Dockerfile
+    container_name: transformersservice
+    ports:
+      - "5000:5000"
+    networks:
+      - mlops-net
+
+  tfidf_svc:
+    build:
+      context: ./tfidf_svc
+      dockerfile: Dockerfile
+    container_name: tfidf_svc
+    ports:
+      - "6000:6000"
+    networks:
+      - mlops-net
+
+networks:
+  mlops-net:
+    driver: bridge

@@ -1,3 +1,8 @@
+"""model distilgpt2
+autre transformer pour repondre aux questions
+et le transformer ancien pour classifier les tickets comme tfidf
+sans if else dans le code"""
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import joblib
