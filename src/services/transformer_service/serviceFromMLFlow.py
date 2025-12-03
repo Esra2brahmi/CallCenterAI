@@ -65,9 +65,9 @@ def load_transformer_model():
     client = mlflow.MlflowClient()
 
     try:
-        exp = client.get_experiment_by_name("Transformer_Models")
+        """exp = client.get_experiment_by_name("Transformer_Models")
         if not exp:
-            raise ValueError("Experiment 'Transformer_Models' not found!")
+            raise ValueError("Experiment 'Transformer_Models' not found!")"""
 
         latest_versions = client.get_latest_versions(name=MODEL_NAME, stages=["None", "Staging", "Production"])
         if not latest_versions:
@@ -157,8 +157,3 @@ def root():
         "docs": "/docs"
     }
 
-# -----------------------------
-# RUN
-# -----------------------------
-if __name__ == "__main__":
-    uvicorn.run("serviceFromMLFlow:app", host="0.0.0.0", port=8000, reload=False)

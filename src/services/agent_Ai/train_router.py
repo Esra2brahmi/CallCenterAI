@@ -36,18 +36,13 @@ NUM_EPOCHS = 3
 # ==============================
 def load_and_prepare_data(training_data_path: str):
     """Load training data generated from services"""
-    
     logger.info(f"Loading training data from {training_data_path}")
     df = pd.read_csv(training_data_path)
     
-    # Check required columns
-    if 'text' not in df.columns or 'router_label' not in df.columns:
-        raise ValueError("Training data must have 'text' and 'router_label' columns")
+    if 'Document' not in df.columns or 'router_label' not in df.columns:
+        raise ValueError("Training data must have 'Document' and 'router_label' columns")
     
-    # Remove any missing values
-    df = df.dropna(subset=['text', 'router_label'])
-    
-    # Ensure labels are integers
+    df = df.dropna(subset=['Document', 'router_label'])
     df['router_label'] = df['router_label'].astype(int)
     
     logger.info(f"Loaded {len(df)} samples")
@@ -57,9 +52,8 @@ def load_and_prepare_data(training_data_path: str):
 
 def create_train_val_split(df: pd.DataFrame, test_size: float = 0.2):
     """Split data into train and validation sets"""
-    
     train_df, val_df = train_test_split(
-        df[['text', 'router_label']],
+        df[['Document', 'router_label']],
         test_size=test_size,
         random_state=42,
         stratify=df['router_label']
@@ -67,37 +61,31 @@ def create_train_val_split(df: pd.DataFrame, test_size: float = 0.2):
     
     logger.info(f"Train set: {len(train_df)} samples")
     logger.info(f"Validation set: {len(val_df)} samples")
-    
     return train_df, val_df
 
 # ==============================
 # Tokenization
 # ==============================
 def tokenize_dataset(df: pd.DataFrame, tokenizer, max_length: int):
-    """Tokenize text data"""
-    
+    """Tokenize Document data"""
     def tokenize_function(examples):
         return tokenizer(
-            examples['text'],
+            examples['Document'],
             padding='max_length',
             truncation=True,
             max_length=max_length
         )
     
-    # Convert to HuggingFace Dataset
     dataset = Dataset.from_pandas(df)
-    
-    # Tokenize
     logger.info("Tokenizing dataset...")
+    
     tokenized = dataset.map(
         tokenize_function,
         batched=True,
-        remove_columns=['text']
+        remove_columns=['Document']
     )
     
-    # Rename label column
     tokenized = tokenized.rename_column('router_label', 'labels')
-    
     return tokenized
 
 # ==============================
@@ -105,39 +93,31 @@ def tokenize_dataset(df: pd.DataFrame, tokenizer, max_length: int):
 # ==============================
 def train_router_model(train_df: pd.DataFrame, val_df: pd.DataFrame):
     """Train DistilGPT-2 for routing"""
-    
     logger.info("Initializing DistilGPT-2 model...")
     model_name = "distilgpt2"
     
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
-    # Add pad token if missing
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load model for binary classification
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=2,  # 0: TF-IDF, 1: Transformer
+        num_labels=2,
         pad_token_id=tokenizer.pad_token_id
     )
     
-    # Set label names
     model.config.id2label = {0: "TF-IDF", 1: "Transformer"}
     model.config.label2id = {"TF-IDF": 0, "Transformer": 1}
     
-    # Tokenize datasets
     train_dataset = tokenize_dataset(train_df, tokenizer, MAX_LENGTH)
     val_dataset = tokenize_dataset(val_df, tokenizer, MAX_LENGTH)
     
-    # Data collator
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     
-    # Training arguments
     training_args = TrainingArguments(
         output_dir=ROUTER_MODEL_PATH,
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         save_strategy="epoch",
         learning_rate=LEARNING_RATE,
         per_device_train_batch_size=BATCH_SIZE,
@@ -153,14 +133,11 @@ def train_router_model(train_df: pd.DataFrame, val_df: pd.DataFrame):
         report_to="none"
     )
     
-    # Metrics
     def compute_metrics(eval_pred):
         predictions, labels = eval_pred
         predictions = np.argmax(predictions, axis=1)
-        
         accuracy = (predictions == labels).mean()
         
-        # Per-class accuracy
         tfidf_mask = labels == 0
         transformer_mask = labels == 1
         
@@ -173,7 +150,6 @@ def train_router_model(train_df: pd.DataFrame, val_df: pd.DataFrame):
             "transformer_accuracy": transformer_acc
         }
     
-    # Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -184,16 +160,13 @@ def train_router_model(train_df: pd.DataFrame, val_df: pd.DataFrame):
         compute_metrics=compute_metrics,
     )
     
-    # Train
     logger.info("Starting training...")
     trainer.train()
     
-    # Save final model
     logger.info(f"Saving model to {ROUTER_MODEL_PATH}")
     trainer.save_model(ROUTER_MODEL_PATH)
     tokenizer.save_pretrained(ROUTER_MODEL_PATH)
     
-    # Final evaluation
     logger.info("\n" + "="*60)
     logger.info("FINAL EVALUATION")
     logger.info("="*60)
@@ -208,18 +181,13 @@ def train_router_model(train_df: pd.DataFrame, val_df: pd.DataFrame):
 # ==============================
 def evaluate_and_visualize(trainer, val_df: pd.DataFrame, tokenizer):
     """Generate evaluation metrics and visualizations"""
-    
     logger.info("Generating evaluation visualizations...")
     
-    # Prepare validation dataset
     val_dataset = tokenize_dataset(val_df, tokenizer, MAX_LENGTH)
-    
-    # Get predictions
     predictions = trainer.predict(val_dataset)
     pred_labels = np.argmax(predictions.predictions, axis=1)
     true_labels = predictions.label_ids
     
-    # Classification report
     print("\n" + "="*60)
     print("CLASSIFICATION REPORT")
     print("="*60)
@@ -230,7 +198,6 @@ def evaluate_and_visualize(trainer, val_df: pd.DataFrame, tokenizer):
         digits=4
     ))
     
-    # Confusion matrix
     cm = confusion_matrix(true_labels, pred_labels)
     
     plt.figure(figsize=(8, 6))
@@ -252,12 +219,10 @@ def evaluate_and_visualize(trainer, val_df: pd.DataFrame, tokenizer):
     logger.info(f"✅ Confusion matrix saved to {confusion_matrix_path}")
     plt.close()
     
-    # Confidence distribution
     probs = np.max(predictions.predictions, axis=1)
     correct = pred_labels == true_labels
     
     plt.figure(figsize=(12, 5))
-    
     plt.subplot(1, 2, 1)
     plt.hist(probs[correct], bins=30, alpha=0.7, label='Correct', color='green')
     plt.hist(probs[~correct], bins=30, alpha=0.7, label='Incorrect', color='red')
@@ -277,27 +242,23 @@ def evaluate_and_visualize(trainer, val_df: pd.DataFrame, tokenizer):
     logger.info(f"✅ Confidence analysis saved to {confidence_plot_path}")
     plt.close()
     
-    # Error analysis
     errors_df = val_df.copy()
     errors_df['predicted'] = pred_labels
     errors_df['correct'] = correct
     errors_df['confidence'] = probs
-    
     errors = errors_df[~errors_df['correct']]
     
     if len(errors) > 0:
         print("\n" + "="*60)
         print(f"ERROR ANALYSIS - {len(errors)} errors ({len(errors)/len(val_df)*100:.2f}%)")
         print("="*60)
-        
         print("\nSample errors:")
         for idx, row in errors.head(5).iterrows():
-            print(f"\nText: {row['text'][:100]}...")
+            print(f"\nDocument: {row['Document'][:100]}...")
             print(f"True: {'Transformer' if row['router_label'] == 1 else 'TF-IDF'}")
             print(f"Predicted: {'Transformer' if row['predicted'] == 1 else 'TF-IDF'}")
             print(f"Confidence: {row['confidence']:.2%}")
     
-    # Save detailed results
     results_path = os.path.join(ROUTER_MODEL_PATH, "evaluation_results.csv")
     errors_df.to_csv(results_path, index=False)
     logger.info(f"✅ Detailed results saved to {results_path}")
@@ -307,6 +268,9 @@ def evaluate_and_visualize(trainer, val_df: pd.DataFrame, tokenizer):
 # ==============================
 def main():
     import argparse
+    
+    # 👇 moved global line here to fix SyntaxError
+    global ROUTER_MODEL_PATH, NUM_EPOCHS, BATCH_SIZE, LEARNING_RATE
     
     parser = argparse.ArgumentParser(description='Train DistilGPT-2 router')
     parser.add_argument('--data', type=str, required=True,
@@ -322,14 +286,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Update global config
-    global ROUTER_MODEL_PATH, NUM_EPOCHS, BATCH_SIZE, LEARNING_RATE
     ROUTER_MODEL_PATH = args.output
     NUM_EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
     LEARNING_RATE = args.learning_rate
     
-    # Create output directory
     os.makedirs(ROUTER_MODEL_PATH, exist_ok=True)
     
     logger.info("="*60)
@@ -342,16 +303,9 @@ def main():
     logger.info(f"Learning rate: {LEARNING_RATE}")
     logger.info("="*60)
     
-    # Load data
     df = load_and_prepare_data(args.data)
-    
-    # Split data
     train_df, val_df = create_train_val_split(df)
-    
-    # Train model
     trainer, tokenizer = train_router_model(train_df, val_df)
-    
-    # Evaluate and visualize
     evaluate_and_visualize(trainer, val_df, tokenizer)
     
     logger.info("\n" + "="*60)

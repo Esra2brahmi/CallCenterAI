@@ -1,24 +1,30 @@
-#for building run: docker build -t tfidf_svc -f docker/tfidf_svc.Dockerfile .
-
+# docker/tfidf_svc.Dockerfile
 FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install nltk
-RUN python -m nltk.downloader stopwords
+# 1. Créer le dossier pour garder la structure propre
+RUN mkdir -p src/services/tfidf_service
 
-COPY src/services/tfidf_service ./src/services/tfidf_service
+# 2. Copier les fichiers nécessaires
+COPY src/services/tfidf_service/app.py src/services/tfidf_service/
+COPY requirements.txt .
 
+# 3. Installer tout d’un coup (requirements + nltk + stopwords)
+#    → une seule couche = image plus petite + plus rapide
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir nltk \
+    && python -c "import nltk; nltk.download('stopwords', download_dir='/usr/share/nltk_data')"
 
-ENV MLFLOW_TRACKING_URI=http://mlflow:5000
-ENV MODEL_NAME=tfidf_svm_model
-ENV MODEL_STAGE=Latest
-ENV TRANSFORMERS_SERVICE_URL=http://transformer:8001/scrub_pii
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
-
+# 4. Variables d’environnement
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    NLTK_DATA=/usr/share/nltk_data
 
 EXPOSE 8000
-CMD ["uvicorn", "src.services.tfidf_svc.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Healthcheck propre (wget n’existe pas par défaut dans python-slim → on utilise curl ou python)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import requests; exit(0) if requests.get('http://localhost:8000/health', timeout=2).status_code == 200 else exit(1)"
+
+CMD ["uvicorn", "src.services.tfidf_service.app:app", "--host", "0.0.0.0", "--port", "8000"]

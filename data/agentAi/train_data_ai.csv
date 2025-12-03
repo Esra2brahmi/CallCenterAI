@@ -1,0 +1,404 @@
+text,router_label
+"I forgot my password",0
+"How do I reset my password?",0
+"Can you help me log in?",0
+"What are your opening hours?",0
+"Is the store open today?",0
+"Where is my order?",0
+"Track my package please",0
+"When will my delivery arrive?",0
+"I want to cancel my subscription",0
+"How do I unsubscribe?",0
+"Please cancel my account",0
+"I need a refund",0
+"Why was I charged twice?",0
+"Can I change my email address?",0
+"Update my phone number",0
+"How do I update my billing info?",0
+"My payment failed",0
+"The app is not working",0
+"I can't sign in on mobile",0
+"Error 404 when opening the site",0
+"Bonjour, je n'ai pas reçu mon colis",1
+"Je veux résilier mon abonnement immédiatement",1
+"Mon compte est bloqué et je ne comprends pas pourquoi",1
+"Pourquoi ai-je été débité de 99€ sans autorisation ?",1
+"Expliquez-moi comment fonctionne le RGPD pour mes données",1
+"Esto es una prueba en español para ver si el sistema entiende",1
+"Este es un texto largo en español sobre un problema técnico con la autenticación OAuth2 en microservicios desplegados en Kubernetes con problemas de latencia en base de datos distribuida y necesitamos una solución urgente",1
+"这是一个中文查询，看看系统是否能正确路由",1
+"我需要处理一个复杂的退款问题，涉及跨境支付和海关税费",1
+"Help! Someone is using my account and I see purchases I didn't make!!!",1
+"URGENT: My card was charged $500 and I didn't authorize this!",1
+"I am extremely disappointed with your service and want to speak to a manager NOW",1
+"Your customer support is useless and I will leave a bad review everywhere",1
+"I have been waiting for 3 weeks and still no solution, this is unacceptable",1
+"Explain quantum computing to me like I'm 5 years old",1
+"Can you tell me a joke?",0
+"What's the weather like today?",0
+"Set a timer for 10 minutes",0
+"Play some music",0
+"Who won the World Cup in 2022?",0
+"How tall is the Eiffel Tower?",0
+"What is the capital of Japan?",0
+"How many days until Christmas?",0
+"Convert 100 USD to EUR",0
+"What time is it in New York?",0
+"My internet is slow",0
+"The Wi-Fi keeps disconnecting",0
+"I can't connect to the VPN",0
+"Printer not responding",0
+"Blue screen error on Windows",0
+"My laptop won't turn on",0
+"Battery drains too fast",0
+"App crashes when I open it",0
+"I need help setting up two-factor authentication",0
+"Enable 2FA on my account",0
+"Send me the invoice for order #12345",0
+"Resend confirmation email",0
+"Download my data export",0
+"I want to delete my account permanently",0
+"How do I close my account?",0
+"Where can I find the user manual?",0
+"Show me the pricing plans",0
+"What is the difference between Basic and Premium?",0
+"Can I upgrade my plan?",0
+"Is there a free trial?",0
+"How do I contact support?",0
+"Call me back please",0
+"I prefer to chat in French",1
+"Parlez-vous français ?",1
+"Bitte helfen Sie mir auf Deutsch",1
+"Por favor, responde en español",1
+"Ayúdame con un problema técnico complejo",1
+"$$$$ FREE IPHONE GIVEAWAY CLICK HERE $$$$",1
+"URGENT: Your account will be suspended!!! Click link",1
+"Congratulations you won $1000 gift card",1
+"Verify your bank details here: phishing-link.com",1
+"I am a Nigerian prince and I need your help to transfer $10M",1
+"I received a suspicious email from your company",1
+"Someone is trying to hack my account",1
+"My session keeps expiring every 5 minutes",0
+"The page is loading very slowly",0
+"Images are not displaying",0
+"Buttons are not clickable",0
+"I can't upload a file",0
+"File size too large error",0
+"Video won't play",0
+"Sound not working",0
+"Microphone not detected",0
+"Camera not working on Zoom",0
+"I need to recover a deleted email",0
+"Restore from trash",0
+"Empty my spam folder",0
+"Mark all as read",0
+"Create a filter for emails",0
+"Set up auto-reply",0
+"Change my email signature",0
+"Forward emails to another address",0
+"I want to speak to a human",1
+"No robot can solve my problem",1
+"This is too complicated for a bot",1
+"I don't want automated responses",1
+"Connect me to a real person immediately",1
+"I've been transferred 5 times and still no solution",1
+"Your AI doesn't understand anything",1
+"I hate chatbots, give me a human",1
+"My problem is very specific and requires human judgment",1
+"Stop sending me to the FAQ",1
+"I already tried everything on the help page",1
+"The suggested solutions don't work",1
+"I've restarted my device 3 times",1
+"I cleared cache and cookies already",1
+"I tried incognito mode, still not working",1
+"This started after the last update",1
+"Everything worked fine yesterday",1
+"The error appeared suddenly this morning",1
+"Other people are having the same issue",1
+"I saw on Reddit that many users have this bug",1
+"There is a known issue with version 2.4.1",1
+"Roll back to previous version please",1
+"I want to downgrade my plan",0
+"Can I pay monthly instead of annually?",0
+"Is there a student discount?",0
+"Do you offer discounts for nonprofits?",0
+"Apply promo code SAVE20",0
+"My coupon code is not working",0
+"The discount was not applied",0
+"I was charged full price instead of discounted",0
+"Extend my trial period",0
+"I need more time to test the Pro features",0
+"Activate my license key",0
+"The activation code is invalid",0
+"Transfer license to new device",0
+"I changed my computer",0
+"Export my data to CSV",0
+"Backup all my projects",0
+"Sync failed between devices",0
+"Changes not appearing on mobile",0
+"Real-time collaboration not working",0
+"Someone else is editing the same file",0
+"Version history is empty",0
+"Recover previous version",0
+"File corrupted after save",0
+"Undo deleted text",0
+"Find and replace all",0
+"Word count of my document",0
+"Change document language",0
+"Spell check is not working",0
+"Grammar suggestions are wrong",0
+"Export to PDF failed",0
+"Print preview is blank",0
+"Page numbers not showing",0
+"Margins are incorrect",0
+"Header and footer missing",0
+"Table of contents not updating",0
+"Comments disappeared",0
+"Track changes is disabled",0
+"Protect document with password",0
+"Remove password protection",0
+"I forgot the document password",1
+"The file is encrypted and I can't open it",1
+"Someone shared a password-protected file with me",1
+"I need to recover an unsaved document",1
+"AutoSave was turned off by accident",1
+"Power went out while working",1
+"My laptop crashed and I lost everything",1
+"I closed the tab without saving",1
+"Browser crashed during editing",1
+"All my tabs were closed",1
+"I was logged out automatically",0
+"Session expired please log in again",0
+"Stay signed in option not working",0
+"Remember me checkbox is grayed out",0
+"Cookies are disabled in browser",0
+"I am using private browsing mode",0
+"Clear browser cache and try again",0
+"Disable ad blocker for this site",0
+"Allow pop-ups from this domain",0
+"Whitelist this website",0
+"Your connection is not secure",0
+"SSL certificate expired",0
+"Mixed content warning",0
+"Firewall is blocking the connection",0
+"VPN is causing issues",0
+"Proxy settings are incorrect",0
+"DNS server not responding",0
+"IP address could not be found",0
+"ERR_CONNECTION_REFUSED",0
+"ERR_NAME_NOT_RESOLVED",0
+"503 Service Unavailable",0
+"504 Gateway Timeout",0
+"429 Too Many Requests",0
+"418 I'm a teapot",0
+"My API key is invalid",1
+"Rate limit exceeded",1
+"Authentication token expired",1
+"Invalid JSON payload",1
+"Missing required parameter",1
+"Endpoint deprecated",1
+"Switch to new API version",1
+"Webhook URL not reachable",1
+"SSL handshake failed",1
+"Certificate verification failed",1
+"CORS policy blocked request",1
+"Access from this origin not allowed",1
+"Content-Security-Policy violation",1
+"X-Frame-Options deny",1
+"Clickjacking protection enabled",1
+"Strict-Transport-Security header",1
+"Implement OAuth2 properly",1
+"Use PKCE for mobile apps",1
+"Refresh token rotation",1
+"Short-lived access tokens",1
+"Revoke token on logout",1
+"I need enterprise-grade security",1
+"Compliance with SOC2 and ISO27001",1
+"Data residency in EU only",1
+"On-premise deployment option",1
+"Air-gapped environment support",1
+"Zero trust architecture",1
+"End-to-end encryption",1
+"Client-side encryption keys",1
+"HIPAA compliant storage",1
+"GDPR data processing agreement",1
+"Right to be forgotten request",1
+"Data subject access request",1
+"Process a deletion request",1
+"Export all personal data",1
+"Anonymize logs and analytics",1
+"I want to opt out of marketing",0
+"Unsubscribe from newsletter",0
+"Stop sending promotional emails",0
+"No more ads please",0
+"Remove me from all mailing lists",0
+"Click the link to confirm unsubscription",0
+"Having trouble unsubscribing?",0
+"Report this email as spam",0
+"Mark as not spam",0
+"Move to inbox",0
+"Create a new folder",0
+"Archive this conversation",0
+"Star important emails",0
+"Snooze until tomorrow",0
+"Remind me in 3 days",0
+"Follow up later",0
+"Add to tasks",0
+"Schedule send",0
+"Send later at 9 AM",0
+"Cancel scheduled email",0
+"Draft saved automatically",0
+"Resume writing",0
+"Insert template",0
+"Use canned response",0
+"Insert signature",0
+"Attach file from drive",0
+"Insert emoji",0
+"Format text as bold",0
+"Change font size",0
+"Add bullet points",0
+"Insert hyperlink",0
+"Add image inline",0
+"Insert table",0
+"Create checklist",0
+"Add due date",0
+"Assign to team member",0
+"Set priority high",0
+"Add labels",0
+"Filter by label",0
+"Search emails",0
+"Advanced search operators",0
+"Search within folder",0
+"Show only unread",0
+"Sort by date",0
+"Group by conversation",0
+"Expand all threads",0
+"Collapse all",0
+"Select all",0
+"Select none",0
+"Select read",0
+"Select unread",0
+"Select starred",0
+"Select important",0
+"Mark as read",0
+"Mark as unread",0
+"Add star",0
+"Remove star",0
+"Mark as important",0
+"Snooze options",0
+"Mute conversation",0
+"Block sender",0
+"Report phishing",0
+"Report spam",0
+"Never send to spam",0
+"Create rule",0
+"Filter similar messages",0
+"Always show images from this sender",0
+"Add to contacts",0
+"Create contact group",0
+"Export contacts",0
+"Import CSV contacts",0
+"Sync with phone",0
+"Enable dark mode",0
+"Change theme color",0
+"Adjust density",0
+"Compact view",0
+"Comfortable view",0
+"Enable conversation view",0
+"Disable conversation view",0
+"Show snippets",0
+"Reading pane on right",0
+"Reading pane below",0
+"No reading pane",0
+"Keyboard shortcuts",0
+"Turn on shortcuts",0
+"Help with shortcuts",0
+"Settings",0
+"Advanced settings",0
+"General tab",0
+"Accounts and Import",0
+"Add another email account",0
+"Check mail from other accounts",0
+"Send mail as",0
+"Grant access to account",0
+"Delegate access",0
+"Download POP mail",0
+"Enable IMAP",0
+"Forward a copy to",0
+"Keep copy in inbox",0
+"Mark as read when forwarded",0
+"Delete after forwarding",0
+"Vacation responder",0
+"Auto-reply message",0
+"Set start and end date",0
+"Only send to contacts",0
+"Only send to people who email me",0
+"Send from this address",0
+"Insert signature image",0
+"Add logo to signature",0
+"Social media links in signature",0
+"Schedule a meeting",0
+"Create calendar event",0
+"Invite guests",0
+"Add video conferencing",0
+"Find a time",0
+"Check availability",0
+"Recurring event",0
+"Daily weekly monthly",0
+"Remind me 30 minutes before",0
+"Add location",0
+"Add description",0
+"Set color for event",0
+"Make it private",0
+"Show as busy",0
+"Show as free",0
+"Out of office event",0
+"Decline invitation",0
+"Accept invitation",0
+"Maybe attending",0
+"Propose new time",0
+"Add note to invitation",0
+"View event details",0
+"Edit event",0
+"Delete event",0
+"Restore deleted event",0
+"Empty trash",0
+"Permanently delete",0
+"Recover deleted email",0
+"Undo send",0
+"Delay send by 10 seconds",0
+"Cancel send",0
+"Sent mail revoked",0
+"Recall message",0
+"Unsend email",0
+"Edit sent message",0
+"Resend email",0
+"Forward to multiple people",0
+"Reply all",0
+"Reply to sender only",0
+"Forward as attachment",0
+"Print email",0
+"Save as PDF",0
+"Download attachments",0
+"Open with Google Docs",0
+"Add to Drive",0
+"Share from Drive",0
+"Request edit access",0
+"Comment on file",0
+"Suggest changes",0
+"Approve changes",0
+"Reject edits",0
+"Compare versions",0
+"See revision history",0
+"Name this version",0
+"Restore this version",0
+"Download as Word",0
+"Download as PDF",0
+"Publish to web",0
+"Embed in website",0
+"Share with public",0
+"Anyone with link can view",0
+"Anyone can edit",0
+"Restricted access",0
+"Add expiration date",0
+"Disable options to download print copy",0

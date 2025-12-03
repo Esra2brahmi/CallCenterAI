@@ -1,3 +1,4 @@
+# Not rcommended
 """
 Generate training data for DistilGPT-2 router by querying both services
 and analyzing their responses to determine optimal routing
@@ -330,8 +331,8 @@ def generate_training_data(input_csv: str, output_csv: str, sample_size: int = N
 if __name__ == "__main__":
     import argparse
     
-        # Hardcoded paths
-    input_csv = "/home/esra/CallCenterAI/data/processed/sample.csv"
+    # Hardcoded paths
+    input_csv = "data/processed/sample.csv"
     output_csv = "router_training_data.csv"
     sample_size = None  # or set an integer if you want
 

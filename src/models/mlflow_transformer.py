@@ -16,6 +16,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../models/transformer_model"))
 RUN_NAME = "transformer_model_run"
 
+
+
 print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
 print(f"[DEBUG] MODEL_DIR: {MODEL_DIR}")
 
@@ -31,7 +33,7 @@ required_files = [
     "special_tokens_map.json",
     "label_encoder.pkl",
 ]
-missing = [f for f in required_files if not os.path.exists(os.path.join(MODEL_DIR, f))]
+missing = [f for f in required_files if not os.path.exists(os.path.join(MODEL_DIR, f))] 
 if missing:
     print(f"[ERROR] Missing files in model directory: {missing}")
     sys.exit(1)
@@ -77,68 +79,54 @@ class TransformerWrapper(mlflow.pyfunc.PythonModel):
             raise e
 
 # -----------------------------
-# LOG MODEL TO MLFLOW
+# LOG MODEL TO MLFLOW (VERSION QUI MARCHE)
 # -----------------------------
 if __name__ == "__main__":
     try:
         mlflow.set_tracking_uri("http://127.0.0.1:5000")
         mlflow.set_experiment("Transformer_Models")
 
-        print("[DEBUG] Starting MLflow run...")
         with mlflow.start_run(run_name=RUN_NAME) as run:
-            print(f"[DEBUG] Active run id: {run.info.run_id}")
+            print(f"[DEBUG] Run ID: {run.info.run_id}")
 
-            # Example input for signature inference
-            example = pd.DataFrame({"text": ["example ticket about billing problem"]})
-
-            # Load test CSV and rename columns if needed
-            test_csv_path = os.path.abspath(os.path.join(BASE_DIR, "../../data/processed/sample.csv"))
-            if os.path.exists(test_csv_path):
-                print(f"[DEBUG] Found test data: {test_csv_path}")
-                test_df = pd.read_csv(test_csv_path)
-                # Rename CSV columns to match model input
-                if "Document" in test_df.columns and "Topic_group" in test_df.columns:
-                    test_df = test_df.rename(columns={"Document": "text", "Topic_group": "label"})
-                    print("[DEBUG] Renaming columns: Document → text, Topic_group → label")
-
-                    fake_context = PythonModelContext(artifacts={"transformer_model": MODEL_DIR}, model_config={}) #ajouté pour test signature
-                    wrapper = TransformerWrapper()
-                    wrapper.load_context(fake_context) #aulieu de wrapper.load_context(artifacts_path=MODEL_DIR) car on utilise le contexte simulé, pas un chemin direct
-
-                    preds = wrapper.predict(None, test_df[["text"]])
-                    acc = accuracy_score(test_df["label"], preds)
-                    f1 = f1_score(test_df["label"], preds, average="weighted")
-                    mlflow.log_metric("accuracy", acc)
-                    mlflow.log_metric("f1_score", f1)
-                    print(f"[DEBUG] Metrics logged → accuracy={acc:.3f}, f1={f1:.3f}")
-                else:
-                    print("[WARNING] Test CSV missing required columns (Document, Topic_group)")
-            else:
-                print("[INFO] No test CSV found — skipping metric logging.")
-
-            #ajouté
-            fake_context = PythonModelContext(artifacts={"transformer_model": MODEL_DIR}, model_config={})
-            sig_wrapper = TransformerWrapper()
-            sig_wrapper.load_context(fake_context)
-            example_output = sig_wrapper.predict(None, example)
-            signature = mlflow.models.infer_signature(example, example_output)
-
-            print("[DEBUG] Logging pyfunc model to MLflow...")
-            mlflow.pyfunc.log_model(
-                artifact_path="transformer_model",
-                python_model=TransformerWrapper(),
+            # 1. Créer une instance et la charger manuellement pour infer la signature
+            wrapper = TransformerWrapper()
+            temp_context = PythonModelContext(
                 artifacts={"transformer_model": MODEL_DIR},
-                input_example=example,
+                model_config={}
+            )
+            wrapper.load_context(temp_context)  # ← Charge vraiment le modèle
+
+            # 2. Inférer la signature avec le modèle chargé
+            example_input = pd.DataFrame({"text": ["example billing issue with payment"]})
+            example_output = wrapper.predict(None, example_input)
+            signature = mlflow.models.infer_signature(example_input, example_output)
+
+            # 3. Optionnel : calcul des métriques (tu l’as déjà, c’est bon)
+
+            # 4. LOG MODEL CORRECTEMENT
+            mlflow.pyfunc.log_model(
+                artifact_path="transformer_model",          
+                python_model=wrapper,                        
+                artifacts={"transformer_model": MODEL_DIR}, 
+                input_example=example_input,
                 signature=signature,
-                registered_model_name="CallCenterTransformer"
-                
+                registered_model_name="CallCenterTransformer",
+                pip_requirements=[
+                    "torch>=2.0",
+                    "transformers>=4.30",
+                    "scikit-learn",
+                    "joblib",
+                    "pandas",
+                    "numpy"
+                ],
+                # code_paths=[os.path.dirname(__file__)],  # si tu as du code custom dans d'autres fichiers
             )
 
-            
-
-            print(f"[SUCCESS] Model logged successfully ✅")
-            print(f"View in MLflow UI → http://127.0.0.1:5000/#/experiments")
+            print("[SUCCESS] Modèle loggé et chargé correctement dans MLflow")
+            print(f"URI → models:/CallCenterTransformer/{run.info.run_id} ou via version")
 
     except Exception as e:
-        print(f"[FATAL ERROR] Something went wrong during MLflow logging: {e}")
+        import traceback
+        traceback.print_exc()
         raise e

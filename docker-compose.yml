@@ -1,0 +1,121 @@
+#>mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts --disable-security-middleware
+#ports externe : interne
+
+#version: "2.39.4"  # version recommandée du schéma Compose
+
+services:
+
+  tfidf_service:
+    build:
+      context: .
+      dockerfile: docker/tfidf_svc.Dockerfile
+    container_name: tfidf_service
+    ports:
+      - "8000:8000"
+    environment:
+      #- MLFLOW_TRACKING_URI=http://192.168.1.195:5000
+      - MLFLOW_TRACKING_URI=http://host.docker.internal:5000
+    #    - MLFLOW_TRACKING_URI=http://host.docker.internal:5000
+    # depends_on: 
+    #   mlflow:
+    #     condition: service_healthy
+
+    networks:
+      - callcenter-network
+      
+  transformer_service:
+    build:
+      context: .
+      dockerfile: docker/transformersService.Dockerfile
+    container_name: transformer_service
+    ports:
+      - "8001:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    networks:
+      - callcenter-network
+
+  
+
+  agent_service:
+    build:
+      context: .
+      dockerfile: docker/agent_service.Dockerfile
+    container_name: agent_service
+    ports:
+      - "8002:8000"   # accès externe à l'API agent
+    environment:
+      - TRANSFORMERS_URL=http://transformerservice:8000
+      - TFIDF_URL=http://tfidf_service:8000
+    depends_on:
+      - transformer_service
+      - tfidf_service
+      #- mlflow
+    
+    networks:
+      - callcenter-network
+  
+  
+  # mlflow:
+  #   image: ghcr.io/mlflow/mlflow:v3.7.0rc0
+  #   container_name: mlflow
+  #   ports:
+  #     - "5000:5000"
+  #   environment:
+  #     - MLFLOW_DISABLE_ENV_VALIDATION=1
+  #   volumes:
+  #     -  ./mlflow:/mlflow
+  #   command: >
+  #     mlflow server 
+  #     --backend-store-uri sqlite:///mlflow/mlflow.db
+  #     --default-artifact-root /mlflow/artifacts
+  #     --host 0.0.0.0
+  #     --port 5000
+  #     --workers 1
+  #     --allowed-hosts "*"
+      
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 20s
+  #   networks:
+  #     - callcenter-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - callcenter-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - callcenter-network
+
+volumes:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  callcenter-network:
+    driver: bridge
