@@ -18,18 +18,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ inputs.service-path }}
 
+    # Remove working-directory from defaults → we control it manually
     strategy:
       matrix:
         mode: [fast, integration]
         include:
           - mode: fast
-            pytest-marker: "not integration"
+            marker: "not integration"
           - mode: integration
-            pytest-marker: "integration"
+            marker: "integration"
 
     steps:
       - uses: actions/checkout@v4
@@ -39,44 +37,49 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip
+      - name: Cache pip per service
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ inputs.service-name }}-${{ hashFiles('**/${{ inputs.service-name }}/requirements.txt') }}  # Fixed: glob path
+          key: pip-${{ inputs.service-name }}-${{ hashFiles(inputs.service-path + '/requirements.txt', 'requirements/dev.txt') }}
+          restore-keys: |
+            pip-${{ inputs.service-name }}-
 
       - name: Install dependencies
+        working-directory: ${{ inputs.service-path }}
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r ../../requirements/dev.txt
           pip install pytest pytest-cov httpx
 
-      # Only tfidf needs a real trained model for integration tests
-      - name: Train TF-IDF model (for integration tests)
+      - name: Train TF-IDF model (only when needed)
         if: ${{ inputs.service-name == 'tfidf' && matrix.mode == 'integration' }}
-        run: python ../../scripts/train_tfidf.py --quick  # Add --quick if your script supports it; otherwise remove
+        run: python scripts/train_tfidf.py --quick
+        # script is at repo root → no working-directory here
 
       - name: Run tests – ${{ matrix.mode }}
+        working-directory: ${{ inputs.service-path }}
         env:
-          PYTEST_ADDOPTS: -m "${{ matrix.pytest-marker }}"
+          PYTEST_ADDOPTS: -m "${{ matrix.marker }}"
         run: |
           pytest ../../tests \
             --cov=. \
             --cov-report=xml:coverage.xml \
-            --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \  # Fixed: local path
+            --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
             -vv
 
-      - name: Upload coverage to Codecov
+      - name: Upload coverage
         if: matrix.mode == 'fast'
+        working-directory: ${{ inputs.service-path }}
         uses: codecov/codecov-action@v4
         with:
-          flags: ${{ inputs.service-name }}
           file: coverage.xml
+          flags: ${{ inputs.service-name }}
 
-      - name: Upload test report
+      - name: Upload junit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: junit-${{ inputs.service-name }}-${{ matrix.mode }}
-          path: ${{ github.workspace }}/junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml  # Fixed: absolute path
+          path: ${{ inputs.service-path }}/junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml
