@@ -1,0 +1,84 @@
+# .github/workflows/lint-test.yml
+name: "Reusable: Lint & Test"
+
+on:
+  workflow_call:
+    inputs:
+      service-path:
+        required: true
+        type: string      # e.g. "src/services/tfidf_service"
+      service-name:
+        required: true
+        type: string      # tfidf, transformer, agent
+      needs-real-model: true/false
+      needs-real-model:
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service-path }}
+
+    strategy:
+      matrix:
+        mode: [fast, integration]
+        include:
+          - mode: fast
+            marker: "not integration"
+            env: PYTEST_FAST=1
+          - mode: integration
+            marker: "integration"
+            condition: ${{ inputs.needs-real-model && (github.ref == 'refs/heads/main' || github.event_name == 'schedule') }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt', inputs.service-path)) }}
+
+      - name: Install service deps + dev tools
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r ../../requirements/dev.txt
+          pip install pytest pytest-cov fastapi[all] httpx
+
+      # Only tfidf needs training before integration tests
+      - name: Train TF-IDF model
+        if: ${{ inputs.service-name == 'tfidf' && matrix.mode == 'integration' }}
+        run: python ../../scripts/train_tfidf.py
+
+      - name: Run tests (${{ matrix.mode }})
+        env:
+          PYTEST_FAST: ${{ matrix.env }}
+        run: |
+          pytest ../../tests/ -m "${{ matrix.marker }}" \
+            --cov=${{ inputs.service-path }} \
+            --cov-report=xml \
+            --junitxml=../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
+            -vv
+
+      - name: Upload coverage
+        if: matrix.mode == 'fast'
+        uses: codecov/codecov-action@v4
+        with:
+          flags: ${{ inputs.service-name }}
+          file: coverage.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ inputs.service-name }}-${{ matrix.mode }}
+          path: ../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml
