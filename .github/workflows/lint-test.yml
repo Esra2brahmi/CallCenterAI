@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt') }}
+          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt')) }}
 
       - name: Install dependencies
         run: |
