@@ -10,7 +10,7 @@ on:
       service-name:
         required: true
         type: string
-      needs-real-model:           # ← corrected, only one entry
+      needs-real-model:
         required: false
         type: boolean
         default: false
@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt')) }}
+          key: pip-${{ inputs.service-name }}-${{ hashFiles('**/${{ inputs.service-name }}/requirements.txt') }}  # Fixed: glob path
 
       - name: Install dependencies
         run: |
@@ -54,8 +54,8 @@ jobs:
 
       # Only tfidf needs a real trained model for integration tests
       - name: Train TF-IDF model (for integration tests)
-        if: inputs.service-name == 'tfidf' && matrix.pytest-marker == 'integration'
-        run: python ../../scripts/train_tfidf.py --quick   # add --quick flag if you have it
+        if: ${{ inputs.service-name == 'tfidf' && matrix.mode == 'integration' }}
+        run: python ../../scripts/train_tfidf.py --quick  # Add --quick if your script supports it; otherwise remove
 
       - name: Run tests – ${{ matrix.mode }}
         env:
@@ -64,7 +64,7 @@ jobs:
           pytest ../../tests \
             --cov=. \
             --cov-report=xml:coverage.xml \
-            --junitxml=../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
+            --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \  # Fixed: local path
             -vv
 
       - name: Upload coverage to Codecov
@@ -72,10 +72,11 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           flags: ${{ inputs.service-name }}
+          file: coverage.xml
 
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: junit-${{ inputs.service-name }}-${{ matrix.mode }}
-          path: ../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml
+          path: ${{ github.workspace }}/junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml  # Fixed: absolute path
