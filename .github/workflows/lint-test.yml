@@ -1,0 +1,81 @@
+# .github/workflows/lint-test.yml
+name: "Reusable: Lint & Test"
+
+on:
+  workflow_call:
+    inputs:
+      service-path:
+        required: true
+        type: string
+      service-name:
+        required: true
+        type: string
+      needs-real-model:           # ← corrected, only one entry
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.service-path }}
+
+    strategy:
+      matrix:
+        mode: [fast, integration]
+        include:
+          - mode: fast
+            pytest-marker: "not integration"
+          - mode: integration
+            pytest-marker: "integration"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r ../../requirements/dev.txt
+          pip install pytest pytest-cov httpx
+
+      # Only tfidf needs a real trained model for integration tests
+      - name: Train TF-IDF model (for integration tests)
+        if: inputs.service-name == 'tfidf' && matrix.pytest-marker == 'integration'
+        run: python ../../scripts/train_tfidf.py --quick   # add --quick flag if you have it
+
+      - name: Run tests – ${{ matrix.mode }}
+        env:
+          PYTEST_ADDOPTS: -m "${{ matrix.pytest-marker }}"
+        run: |
+          pytest ../../tests \
+            --cov=. \
+            --cov-report=xml:coverage.xml \
+            --junitxml=../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
+            -vv
+
+      - name: Upload coverage to Codecov
+        if: matrix.mode == 'fast'
+        uses: codecov/codecov-action@v4
+        with:
+          flags: ${{ inputs.service-name }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ inputs.service-name }}-${{ matrix.mode }}
+          path: ../../junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml

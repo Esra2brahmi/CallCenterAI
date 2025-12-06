@@ -1,0 +1,27 @@
+# .github/workflows/ci-tfidf.yml
+name: CI – TF-IDF Service
+on:
+  push:
+    paths:
+      - 'src/services/tfidf_service/**'
+      - 'scripts/train_tfidf.py'
+      - '.github/workflows/lint-test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/lint-test.yml
+    with:
+      service-path: src/services/tfidf_service
+      service-name: tfidf
+      needs-real-model: true
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/docker-build.yml
+    secrets: inherit
+    with:
+      service-name: tfidf
+      dockerfile: docker/tfidf_svc.Dockerfile

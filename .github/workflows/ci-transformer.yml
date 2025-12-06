@@ -1,0 +1,26 @@
+# .github/workflows/ci-transformer.yml
+name: CI – Transformer Service
+on:
+  push:
+    paths:
+      - 'src/services/transformer_service/**'
+      - '.github/workflows/lint-test.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/lint-test.yml
+    with:
+      service-path: src/services/transformer_service
+      service-name: transformer
+      needs-real-model: false     # no training script yet → fast tests only
+
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/docker-build.yml
+    secrets: inherit
+    with:
+      service-name: transformer
+      dockerfile: docker/transformersService.Dockerfile
