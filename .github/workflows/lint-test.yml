@@ -30,10 +30,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       # Reliable cache key – no "+" inside hashFiles()
       - name: Cache pip
@@ -49,13 +49,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install -r ../../requirements/dev.txt
           pip install pytest pytest-cov httpx
 
-      - name: Train TF-IDF model (integration only)
+      - name: service TF-IDF model (integration only)
         if: inputs.service-name == 'tfidf' && matrix.mode == 'integration'
         working-directory: .
-        run: python scripts/train_tfidf.py   # or add --quick if you prefer
+        run: python src/services/tfidf_service/app.py   # or add --quick if you prefer
 
       - name: Run tests – ${{ matrix.mode }}
         working-directory: ${{ inputs.service-path }}
