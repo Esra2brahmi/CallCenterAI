@@ -17,8 +17,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - mode: fast         ; marker: "not integration"
-          - mode: integration  ; marker: "integration"
+          - mode: fast         
+            marker: "not integration"
+          - mode: integration  
+            marker: "integration"
 
     steps:
       - uses: actions/checkout@v4
