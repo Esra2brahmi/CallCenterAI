@@ -62,42 +62,60 @@ jobs:
           artifact_location: file://${{ github.workspace }}/mlruns/0
           EOF
 
-          # 2. Crée un run + log direct d'un dummy model (sans fichier temporaire)
+          # 2. Crée un modèle dummy pyfunc valide + enregistre les deux modèles nécessaires
           python - <<'PY'
           import mlflow
+          import mlflow.pyfunc
           import numpy as np
           import os
 
           mlflow.set_tracking_uri(f"file://{os.getenv('GITHUB_WORKSPACE')}/mlruns")
 
-          class DummyModel:
-              def predict(self, X):
-                  return ["mock"] if isinstance(X, str) else ["mock"] * len(X)
-              def predict_proba(self, X):
-                  return np.array([[0.1, 0.9]] * (1 if isinstance(X, str) else len(X)))
-              classes_ = ["mock_A", "mock_B"]
+          # Classe valide pour mlflow.pyfunc
+          class DummyModel(mlflow.pyfunc.PythonModel):
+              def predict(self, context, model_input):
+                  if isinstance(model_input, str):
+                      return ["mock"]
+                  elif hasattr(model_input, '__len__') and len(model_input) > 0 and isinstance(model_input[0], str):
+                      return ["mock"] * len(model_input)
+                  else:
+                      return ["mock"]
 
           with mlflow.start_run(experiment_id="0") as run:
+              run_id = run.info.run_id
+
+              # Log du modèle dummy (nom correct pour éviter le warning)
               mlflow.pyfunc.log_model(
                   artifact_path="model",
                   python_model=DummyModel(),
+                  registered_model_name="dummy_for_ci_only"  # on log sous un nom temporaire
               )
-              RUN_ID = run.info.run_id
-              print(f"Dummy run created: {RUN_ID}")
 
-              # Enregistrement direct des modèles cherchés par ton code
-              for name in ["tfidf_svm_ticket_classifier", "CallCenterTransformer"]:
+              # Enregistrement direct des deux modèles que ton code cherche
+              client = mlflow.MlflowClient()
+              model_names = ["tfidf_svm_ticket_classifier", "CallCenterTransformer"]
+
+              for name in model_names:
                   try:
-                      client = mlflow.MlflowClient()
                       client.create_registered_model(name)
                   except:
-                      pass  # déjà existant
-                  mv = mlflow.register_model(f"runs:/{RUN_ID}/model", name)
-                  client.transition_model_version_stage(name, mv.version, "Production")
-                  print(f"Registered dummy model: {name} v{mv.version} → Production")
+                      pass  # déjà existe
+
+                  # Enregistre depuis le run
+                  mv = client.create_model_version(
+                      name=name,
+                      source=f"{run.info.artifact_uri}/model",
+                      run_id=run_id
+                  )
+                  client.transition_model_version_stage(
+                      name=name,
+                      version=mv.version,
+                      stage="Production",
+                      archive_existing_versions=True
+                  )
+                  print(f"Dummy model registered: {name} v{mv.version} → Production")
           PY
 
-          # Export de l'URI
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
 
       - name: Run tests
