@@ -88,6 +88,10 @@ jobs:
           PY
 
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
+      - name: Setup local MLflow tracking (required for import)
+        run: |
+          mkdir -p mlruns
+          echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
 
       # Fix case-sensitive import for agent_Ai → agent_ai on Linux
       - name: Fix agent_ai import for CI
