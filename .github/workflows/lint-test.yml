@@ -41,23 +41,22 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov httpx
+          pip install pytest pytest-cov httpx sentence-transformers numpy\<2.0.0
 
-      # THIS IS THE MAGIC LINE THAT FIXES EVERYTHING
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      - name: Train real models (integration only)
-        if: matrix.mode == 'integration'
+      # TRAIN MODEL BEFORE ANY TEST IMPORTS THE APP
+      - name: Train/register model (for ALL test runs if needed)
         env:
           MLFLOW_TRACKING_URI: file:./mlruns
         run: |
-          echo "Training model for ${{ inputs.service-name }}"
+          echo "Training ${{ inputs.service-name }} model (required for app import)"
           case "${{ inputs.service-name }}" in
             tfidf)       python -m src.models.mlflow_tfidf ;;
             transformer) python -m src.models.mlflow_transformer ;;
-            agent_ai|agent) python -m src.services.agent_ai.train_router ;;
-            *)           echo "No training step" ;;
+            agent_ai)    python -m src.services.agent_ai.train_router ;;
+            *)           echo "No training needed" ;;
           esac
 
       - name: Run tests

@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/services/tfidf_service/**'
       - 'src/models/mlflow_tfidf.py'
-      - 'requirements/**'
+      - 'requirements.txt'
       - 'tests/**'
   pull_request:
   workflow_dispatch:
@@ -16,4 +16,4 @@ jobs:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/tfidf_service
-      service-name: app
+      service-name: tfidf    # ← MUST BE tfidf, not "app"

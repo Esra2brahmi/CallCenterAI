@@ -16,4 +16,4 @@ jobs:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/transformer_service
-      service-name: serviceFromMLFlow
+      service-name: transformer
