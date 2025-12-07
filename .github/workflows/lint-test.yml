@@ -49,7 +49,7 @@ jobs:
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # LA SEULE CHOSE QU'ON AJOUTE – 100 % magique, 0 modification ailleurs
-            - name: Create dummy MLflow registry + register fake models (works 100%)
+      - name: Create dummy MLflow registry + register fake models (works 100%)
         run: |
           set -e
 
