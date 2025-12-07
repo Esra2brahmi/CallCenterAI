@@ -15,4 +15,4 @@ jobs:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/agent_ai
-      service-name: appGPT
+      service-name: agent_ai    # ← must be "agent_ai" to match requirements/agent_ai.txt if exists
