@@ -49,13 +49,12 @@ jobs:
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # LA SEULE CHOSE QU'ON AJOUTE – 100 % magique, 0 modification ailleurs
-      - name: Setup dummy MLflow registry + fake models (100% working – no more crashes)
+      - name: Setup dummy MLflow registry + fake models (100% working – 2025 proof)
         run: |
           set -euo pipefail
 
-          # 1. Crée mlruns + experiment 0
+          # 1. Crée le répertoire + experiment 0
           mkdir -p mlruns/0
-
           cat > mlruns/0/meta.yaml <<EOF
           experiment_id: 0
           name: Default
@@ -63,44 +62,42 @@ jobs:
           artifact_location: file://${{ github.workspace }}/mlruns/0
           EOF
 
-          # 2. Crée un run factice avec un UUID propre
-          RUN_ID=$(python -c 'import uuid; print(uuid.uuid4())')
-          mkdir -p "mlruns/0/${RUN_ID}/artifacts/model"
-
-          # 3. Log un modèle dummy compatible sklearn + pyfunc
-          cat > /tmp/dummy_model.py <<'PY'
+          # 2. Crée un run + log direct d'un dummy model (sans fichier temporaire)
+          python - <<'PY'
+          import mlflow
           import numpy as np
+          import os
+
+          mlflow.set_tracking_uri(f"file://{os.getenv('GITHUB_WORKSPACE')}/mlruns")
+
           class DummyModel:
-              def predict(self, X): return ["mock"] if isinstance(X, str) else ["mock"] * len(X)
-              def predict_proba(self, X): return np.array([[0.1, 0.9]] * (1 if isinstance(X, str) else len(X)))
+              def predict(self, X):
+                  return ["mock"] if isinstance(X, str) else ["mock"] * len(X)
+              def predict_proba(self, X):
+                  return np.array([[0.1, 0.9]] * (1 if isinstance(X, str) else len(X)))
               classes_ = ["mock_A", "mock_B"]
+
+          with mlflow.start_run(experiment_id="0") as run:
+              mlflow.pyfunc.log_model(
+                  artifact_path="model",
+                  python_model=DummyModel(),
+              )
+              RUN_ID = run.info.run_id
+              print(f"Dummy run created: {RUN_ID}")
+
+              # Enregistrement direct des modèles cherchés par ton code
+              for name in ["tfidf_svm_ticket_classifier", "CallCenterTransformer"]:
+                  try:
+                      client = mlflow.MlflowClient()
+                      client.create_registered_model(name)
+                  except:
+                      pass  # déjà existant
+                  mv = mlflow.register_model(f"runs:/{RUN_ID}/model", name)
+                  client.transition_model_version_stage(name, mv.version, "Production")
+                  print(f"Registered dummy model: {name} v{mv.version} → Production")
           PY
 
-          python -c "
-          import mlflow, os
-          from tmp.dummy_model import DummyModel
-          mlflow.set_tracking_uri('file://${{ github.workspace }}/mlruns')
-          with mlflow.start_run(run_id='$RUN_ID', experiment_id='0'):
-              mlflow.pyfunc.log_model('model', python_model=DummyModel(), artifact_path='model')
-          "
-
-          # 4. Enregistre les deux modèles que ton code cherche vraiment
-          python -c "
-          import mlflow, os
-          mlflow.set_tracking_uri('file://${{ github.workspace }}/mlruns')
-          client = mlflow.MlflowClient()
-
-          for name in ['tfidf_svm_ticket_classifier', 'CallCenterTransformer']:
-              try:
-                  mv = client.create_registered_model(name)
-              except:
-                  pass
-              mv = mlflow.register_model(f'runs:/$RUN_ID/model', name)
-              client.transition_model_version_stage(name, mv.version, 'Production')
-              print(f'→ Dummy {name} v{mv.version} registered in Production')
-          "
-
-          # 5. Export de la variable
+          # Export de l'URI
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
 
       - name: Run tests
