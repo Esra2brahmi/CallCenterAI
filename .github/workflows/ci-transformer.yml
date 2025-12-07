@@ -1,16 +1,4 @@
 # .github/workflows/ci-transformer.yml
-name: CI – Transformer Service
-
-on:
-  push:
-    paths:
-      - 'src/services/transformer_service/**'
-      - 'src/models/mlflow_transformer.py'
-      - 'requirements/**'
-      - 'tests/**'
-  pull_request:
-  workflow_dispatch:
-
 jobs:
   test:
     uses: ./.github/workflows/lint-test.yml

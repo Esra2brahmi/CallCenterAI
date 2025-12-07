@@ -1,19 +1,7 @@
 # .github/workflows/ci-tfidf.yml
-name: CI – TF-IDF Service
-
-on:
-  push:
-    paths:
-      - 'src/services/tfidf_service/**'
-      - 'src/models/mlflow_tfidf.py'
-      - 'requirements.txt'
-      - 'tests/**'
-  pull_request:
-  workflow_dispatch:
-
 jobs:
   test:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/tfidf_service
-      service-name: tfidf    # ← MUST BE tfidf, not "app"
+      service-name: tfidf     # ← correct

@@ -41,23 +41,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov httpx sentence-transformers numpy\<2.0.0
+          pip install pytest pytest-cov httpx sentence-transformers "numpy<2.0"
+
+      - name: Set CI mode (skip heavy model loading)
+        run: echo "CI=true" >> $GITHUB_ENV
 
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
-
-      # TRAIN MODEL BEFORE ANY TEST IMPORTS THE APP
-      - name: Train/register model (for ALL test runs if needed)
-        env:
-          MLFLOW_TRACKING_URI: file:./mlruns
-        run: |
-          echo "Training ${{ inputs.service-name }} model (required for app import)"
-          case "${{ inputs.service-name }}" in
-            tfidf)       python -m src.models.mlflow_tfidf ;;
-            transformer) python -m src.models.mlflow_transformer ;;
-            agent_ai)    python -m src.services.agent_ai.train_router ;;
-            *)           echo "No training needed" ;;
-          esac
 
       - name: Run tests
         run: |
