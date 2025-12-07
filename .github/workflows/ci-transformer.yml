@@ -8,15 +8,11 @@ on:
       - 'tests/**'
       - 'requirements.txt'
   pull_request:
-    paths:
-      - 'src/services/transformer_service/**'
-      - 'tests/**'
-      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
-  lint-test:
+  test:
     uses: ./.github/workflows/lint-test.yml
     with:
-      service-path: src/services/transformer_service
+      service-path: src.services.transformer_service
       service-name: transformer

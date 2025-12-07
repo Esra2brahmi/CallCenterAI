@@ -4,19 +4,16 @@ name: CI – Agent AI Service
 on:
   push:
     paths:
+      - 'src/services/agent_Ai/**'
       - 'src/services/agent_ai/**'
       - 'tests/**'
       - 'requirements.txt'
   pull_request:
-    paths:
-      - 'src/services/agent_ai/**'
-      - 'tests/**'
-      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
-  lint-test:
+  test:
     uses: ./.github/workflows/lint-test.yml
     with:
-      service-path: src/services/agent_ai
+      service-path: src.services.agent_ai
       service-name: agent_ai

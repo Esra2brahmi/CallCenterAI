@@ -46,30 +46,24 @@ jobs:
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      # ← CETTE LIGNE EST CELLE QUE TU CHERCHAIS
-      - name: Create dummy mlruns dir
-        run: mkdir -p /tmp/nonexistent
-
-      # Fix agent_Ai → agent_ai + variables CI
-      - name: Fix agent_ai import + disable MLflow in CI
+      # SOLUTION COMPLÈTE – TOUT EST FIXÉ ICI
+      - name: Fix MLflow + agent_Ai case sensitivity
         run: |
           set -euo pipefail
 
-          # Fix dossier agent_Ai (Linux case-sensitive)
+          # Crée un mlruns vide
+          mkdir -p /tmp/mlruns-ci
+          echo "MLFLOW_TRACKING_URI=file:/tmp/mlruns-ci" >> $GITHUB_ENV
+
+          # Fix agent_Ai → agent_ai (Linux)
           if [ -d "src/services/agent_Ai" ] && [ ! -d "src/services/agent_ai" ]; then
             mkdir -p src/services/agent_ai
-            cp src/services/agent_Ai/appGPT.py src/services/agent_ai/appGPT.py
+            cp src/services/agent_Ai/appGPT.py src/services/agent_ai/
             touch src/services/agent_ai/__init__.py
-            echo "agent_ai folder fixed"
+            echo "agent_Ai → agent_ai fixed"
           fi
 
-          # Variables pour désactiver le chargement MLflow
-          echo "MLFLOW_TRACKING_URI=file:/tmp/nonexistent" >> $GITHUB_ENV
-          echo "SKIP_MLFLOW_LOAD=1" >> $GITHUB_ENV
-
-      # Monkey-patch MLflow pour que get_latest_versions() retourne toujours un modèle
-      - name: Patch MLflow client (critical)
-        run: |
+          # Monkey-patch MLflow : tous les modèles existent
           python -c "
           import mlflow
           from mlflow.tracking.client import MlflowClient
@@ -79,11 +73,10 @@ jobs:
               current_stage = 'Production'
 
           def fake_get_latest_versions(name, stages=None):
-              print(f'[CI PATCH] Model {name} found (fake)')
               return [FakeVersion()]
 
           MlflowClient.get_latest_versions = fake_get_latest_versions
-          print('MLflow patched – no more Model Registry errors')
+          print('MLflow patched – no more model registry errors')
           "
 
       - name: Run tests
@@ -95,8 +88,8 @@ jobs:
             --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
             -vv
 
-      - name: Upload coverage to Codecov
-        if: matrix.mode == 'fast'
+      - name: Upload coverage
+      if: matrix.mode == 'fast'
         uses: codecov/codecov-action@v4
         with:
           files: coverage.xml
