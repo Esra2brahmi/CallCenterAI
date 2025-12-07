@@ -18,8 +18,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    # Remove working-directory from defaults → we control it manually
     strategy:
       matrix:
         mode: [fast, integration]
@@ -37,11 +35,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache pip per service
+      # Reliable cache key – no "+" inside hashFiles()
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ inputs.service-name }}-${{ hashFiles(inputs.service-path + '/requirements.txt', 'requirements/dev.txt') }}
+          key: pip-${{ inputs.service-name }}-${{ hashFiles(format('{0}/requirements.txt', inputs.service-path), 'requirements/dev.txt') }}
           restore-keys: |
             pip-${{ inputs.service-name }}-
 
@@ -53,10 +52,10 @@ jobs:
           pip install -r ../../requirements/dev.txt
           pip install pytest pytest-cov httpx
 
-      - name: Train TF-IDF model (only when needed)
-        if: ${{ inputs.service-name == 'tfidf' && matrix.mode == 'integration' }}
-        run: python scripts/train_tfidf.py --quick
-        # script is at repo root → no working-directory here
+      - name: Train TF-IDF model (integration only)
+        if: inputs.service-name == 'tfidf' && matrix.mode == 'integration'
+        working-directory: .
+        run: python scripts/train_tfidf.py   # or add --quick if you prefer
 
       - name: Run tests – ${{ matrix.mode }}
         working-directory: ${{ inputs.service-path }}
@@ -69,15 +68,14 @@ jobs:
             --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
             -vv
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         if: matrix.mode == 'fast'
-        working-directory: ${{ inputs.service-path }}
         uses: codecov/codecov-action@v4
         with:
-          file: coverage.xml
+          file: ${{ inputs.service-path }}/coverage.xml
           flags: ${{ inputs.service-name }}
 
-      - name: Upload junit report
+      - name: Upload JUnit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
