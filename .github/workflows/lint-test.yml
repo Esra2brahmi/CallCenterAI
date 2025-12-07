@@ -89,7 +89,7 @@ jobs:
             -vv
 
       - name: Upload coverage
-      if: matrix.mode == 'fast'
+        if: matrix.mode == 'fast'
         uses: codecov/codecov-action@v4
         with:
           files: coverage.xml
