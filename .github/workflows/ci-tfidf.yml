@@ -7,7 +7,7 @@ on:
       - 'src/services/tfidf_service/**'
       - 'src/models/mlflow_tfidf.py'
       - 'requirements/**'
-      - '.github/workflows/lint-test.yml'
+      - 'tests/**'
   pull_request:
   workflow_dispatch:
 
@@ -16,13 +16,4 @@ jobs:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/tfidf_service
-      service-name: tfidf
-
-  build:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/docker-build.yml
-    secrets: inherit
-    with:
-      service-name: tfidf
-      dockerfile: docker/tfidf_svc.Dockerfile
+      service-name: app

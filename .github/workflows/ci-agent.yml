@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/services/agent_ai/**'
       - 'requirements/**'
-      - '.github/workflows/lint-test.yml'
+      - 'tests/**'
   pull_request:
   workflow_dispatch:
 
@@ -15,13 +15,4 @@ jobs:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/agent_ai
-      service-name: agent_ai
-
-  build:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/docker-build.yml
-    secrets: inherit
-    with:
-      service-name: agent_ai
-      dockerfile: docker/agent_service.Dockerfile
+      service-name: appGPT
