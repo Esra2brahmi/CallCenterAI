@@ -15,5 +15,5 @@ jobs:
   test:
     uses: ./.github/workflows/lint-test.yml
     with:
-      service-path: src.services.agent_ai
+      service-path: src.services.agent_Ai
       service-name: agent_ai

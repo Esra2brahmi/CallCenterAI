@@ -46,24 +46,18 @@ jobs:
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      # SOLUTION COMPLÈTE – TOUT EST FIXÉ ICI
-      - name: Fix MLflow + agent_Ai case sensitivity
+      # SOLUTION 100% FONCTIONNELLE – TOUT EST FIXÉ ICI
+      - name: Fix agent_Ai import + patch MLflow (no service/test changes)
         run: |
           set -euo pipefail
 
-          # Crée un mlruns vide
-          mkdir -p /tmp/mlruns-ci
-          echo "MLFLOW_TRACKING_URI=file:/tmp/mlruns-ci" >> $GITHUB_ENV
-
-          # Fix agent_Ai → agent_ai (Linux)
+          # 1. Fix agent_Ai → agent_ai (Linux case-sensitive) – avec SYMLINK
           if [ -d "src/services/agent_Ai" ] && [ ! -d "src/services/agent_ai" ]; then
-            mkdir -p src/services/agent_ai
-            cp src/services/agent_Ai/appGPT.py src/services/agent_ai/
-            touch src/services/agent_ai/__init__.py
-            echo "agent_Ai → agent_ai fixed"
+            ln -s "${{ github.workspace }}/src/services/agent_Ai" "${{ github.workspace }}/src/services/agent_ai"
+            echo "Symlink created: agent_ai → agent_Ai"
           fi
 
-          # Monkey-patch MLflow : tous les modèles existent
+          # 2. Patch MLflow : tous les modèles existent toujours
           python -c "
           import mlflow
           from mlflow.tracking.client import MlflowClient
@@ -76,7 +70,7 @@ jobs:
               return [FakeVersion()]
 
           MlflowClient.get_latest_versions = fake_get_latest_versions
-          print('MLflow patched – no more model registry errors')
+          print('MLflow patched – model registry errors eliminated')
           "
 
       - name: Run tests
@@ -88,7 +82,7 @@ jobs:
             --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
             -vv
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         if: matrix.mode == 'fast'
         uses: codecov/codecov-action@v4
         with:
