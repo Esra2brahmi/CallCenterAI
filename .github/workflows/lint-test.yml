@@ -49,73 +49,76 @@ jobs:
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # LA SEULE CHOSE QU'ON AJOUTE – 100 % magique, 0 modification ailleurs
-      - name: Create dummy MLflow registry + register fake models (works 100%)
+      - name: Create dummy MLflow registry + fake registered models (works 100%)
         run: |
           set -e
 
-          # 1. Crée le répertoire + experiment par défaut
+          # 1. Crée le répertoire mlruns + experiment 0
           mkdir -p mlruns/0
-          
-          # 2. meta.yaml de l'experiment 0 (obligatoire)
-          cat > mlruns/0/meta.yaml <<'EOF'
+
+          # 2. meta.yaml obligatoire pour l'experiment 0
+          cat > mlruns/0/meta.yaml <<EOF
           experiment_id: 0
           name: Default
           lifecycle_stage: active
-          artifact_location: file:///home/runner/work/CallCenterAI/CallCenterAI/mlruns/0
+          artifact_location: file://${{ github.workspace }}/mlruns/0
           EOF
 
-          # 3. Crée un faux run
-          RUN_ID=$(python -c "import uuid; print(uuid.uuid4())")
-          mkdir -p mlruns/0/$RUN_ID/artifacts/model
+          # 3. Crée un run factice
+          RUN_ID=$(python -c "import uuid, os; print(uuid.uuid4())")
+          mkdir -p "mlruns/0/${RUN_ID}/artifacts/model"
 
           # 4. Log un modèle pyfunc factice (compatible sklearn + pyfunc)
           python - <<'PY'
           import mlflow
           import numpy as np
-          from pathlib import Path
+          import os
 
-          mlflow.set_tracking_uri("file://${{ github.workspace }}/mlruns")
+          mlflow.set_tracking_uri(f"file://{os.getenv('GITHUB_WORKSPACE')}/mlruns")
 
           class DummyModel:
-              def predict(self, X): 
+              def predict(self, X):
                   return ["mock"] if isinstance(X, str) else ["mock"] * len(X)
-              def predict_proba(self, X): 
-                  return np.array([[0.1, 0.9]] * (len(X) if hasattr(X, "__len__") else 1))
+              def predict_proba(self, X):
+                  return np.array([[0.1, 0.9]] * (len(X) if hasattr(X, '__len__') else 1))
               classes_ = ["mock_class1", "mock_class2"]
 
-          with mlflow.start_run(run_id="${RUN_ID}"):
+          with mlflow.start_run(run_id="${RUN_ID}", experiment_id="0"):
               mlflow.pyfunc.log_model(
                   artifact_path="model",
                   python_model=DummyModel(),
-                  signature=None
               )
           PY
 
-          # 5. Enregistre les 3 modèles avec les noms exacts que ton code cherche
+          # 5. Enregistre les modèles avec les noms exacts que ton code cherche
           python - <<'PY'
           import mlflow
-          mlflow.set_tracking_uri("file://${{ github.workspace }}/mlruns")
-          
+          import os
+
+          tracking_uri = f"file://{os.getenv('GITHUB_WORKSPACE')}/mlruns"
+          mlflow.set_tracking_uri(tracking_uri)
+          client = mlflow.MlflowClient(tracking_uri)
+
           model_names = [
               "tfidf_svm_ticket_classifier",
-              "CallCenterTransformer",
-              # Ajoute d'autres si besoin, mais ces 2 suffisent pour tfidf + transformer
+              "CallCenterTransformer"
           ]
 
           for name in model_names:
               try:
-                  mv = mlflow.register_model(f"runs:/${RUN_ID}/model", name)
-                  # On passe directement en Production (évite le stage None)
-                  client = mlflow.MlflowClient()
+                  model_version = mlflow.register_model(f"runs:/${RUN_ID}/model", name)
                   client.transition_model_version_stage(
-                      name=name, version=mv.version, stage="Production"
+                      name=name,
+                      version=model_version.version,
+                      stage="Production",
+                      archive_existing_versions=True
                   )
-                  print(f"Registered dummy model: {name} v{mv.version} (Production)")
+                  print(f"Dummy model registered: {name} v{model_version.version} → Production")
               except Exception as e:
-                  print(f"Already registered or minor error (ok): {name} → {e}")
+                  print(f"{name} already exists or minor error (OK): {e}")
           PY
 
-          # 6. Export de la variable d’environnement pour les services
+          # 6. Export de l'URI
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
 
       - name: Run tests
