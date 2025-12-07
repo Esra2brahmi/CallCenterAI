@@ -1,6 +1,21 @@
 # .github/workflows/ci-transformer.yml
+name: CI – Transformer Service
+
+on:
+  push:
+    paths:
+      - 'src/services/transformer_service/**'
+      - 'tests/**'
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - 'src/services/transformer_service/**'
+      - 'tests/**'
+      - 'requirements.txt'
+  workflow_dispatch:
+
 jobs:
-  test:
+  lint-test:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/transformer_service

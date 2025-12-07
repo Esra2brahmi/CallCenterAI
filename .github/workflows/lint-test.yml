@@ -1,13 +1,15 @@
 # .github/workflows/lint-test.yml
-name: "Reusable: Lint & Test"
+name: "Reusable: Lint & Test (Services)"
 
 on:
   workflow_call:
     inputs:
       service-path:
+        description: "Path to the service package (e.g. src/services/tfidf_service)"
         required: true
         type: string
       service-name:
+        description: "Short name used for coverage flags and artifacts"
         required: true
         type: string
 
@@ -41,13 +43,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov httpx sentence-transformers "numpy<2.0"
-
-      - name: Set CI mode (skip heavy model loading)
-        run: echo "CI=true" >> $GITHUB_ENV
+          pip install pytest pytest-cov httpx sentence-transformers "numpy<2.0.0"
 
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
+      # Optional: only if some services still need local MLflow setup for import-time registration
+      - name: Set up local MLflow tracking (for import-time model lookup)
+        run: |
+          mkdir -p ./mlruns
+          echo "MLFLOW_TRACKING_URI=file:$(pwd)/mlruns" >> $GITHUB_ENV
 
       - name: Run tests
         run: |
@@ -58,16 +63,15 @@ jobs:
             --junitxml=junit-${{ inputs.service-name }}-${{ matrix.mode }}.xml \
             -vv
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         if: matrix.mode == 'fast'
         uses: codecov/codecov-action@v4
         with:
-          file: coverage.xml
+          files: coverage.xml
           flags: ${{ inputs.service-name }}
 
       - name: Upload JUnit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: junit-${{ inputs.service-name }}-${{ matrix.mode }}
-          path: junit-*.xml
+          name: junit

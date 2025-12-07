@@ -1,7 +1,22 @@
 # .github/workflows/ci-tfidf.yml
+name: CI – TF-IDF Service
+
+on:
+  push:
+    paths:
+      - 'src/services/tfidf_service/**'
+      - 'tests/**'
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - 'src/services/tfidf_service/**'
+      - 'tests/**'
+      - 'requirements.txt'
+  workflow_dispatch:
+
 jobs:
-  test:
+  lint-test:
     uses: ./.github/workflows/lint-test.yml
     with:
       service-path: src/services/tfidf_service
-      service-name: tfidf     # ← correct
+      service-name: tfidf
