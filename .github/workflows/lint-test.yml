@@ -43,6 +43,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov httpx
 
+      # THIS IS THE MAGIC LINE THAT FIXES EVERYTHING
+      - name: Add project root to PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
       - name: Train real models (integration only)
         if: matrix.mode == 'integration'
         env:
