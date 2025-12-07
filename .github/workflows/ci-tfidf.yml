@@ -1,11 +1,13 @@
+# .github/workflows/ci-tfidf.yml
 name: CI – TF-IDF Service
 
 on:
   push:
     paths:
       - 'src/services/tfidf_service/**'
-      - 'scripts/train_tfidf.py'
+      - 'src/models/mlflow_tfidf.py'
       - 'requirements/**'
+      - '.github/workflows/lint-test.yml'
   pull_request:
   workflow_dispatch:
 
@@ -15,7 +17,6 @@ jobs:
     with:
       service-path: src/services/tfidf_service
       service-name: tfidf
-      needs-real-model: true
 
   build:
     needs: test

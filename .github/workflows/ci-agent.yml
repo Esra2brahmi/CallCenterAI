@@ -1,10 +1,12 @@
+# .github/workflows/ci-agent.yml
 name: CI – Agent AI Service
 
 on:
   push:
     paths:
-      - 'src/services/agent_Ai/**'
+      - 'src/services/agent_ai/**'
       - 'requirements/**'
+      - '.github/workflows/lint-test.yml'
   pull_request:
   workflow_dispatch:
 
@@ -12,9 +14,8 @@ jobs:
   test:
     uses: ./.github/workflows/lint-test.yml
     with:
-      service-path: src/services/agent_Ai
-      service-name: agent
-      needs-real-model: false
+      service-path: src/services/agent_ai
+      service-name: agent_ai
 
   build:
     needs: test
@@ -22,5 +23,5 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     secrets: inherit
     with:
-      service-name: agent
+      service-name: agent_ai
       dockerfile: docker/agent_service.Dockerfile
