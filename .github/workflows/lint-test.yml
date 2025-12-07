@@ -48,11 +48,41 @@ jobs:
       - name: Add project root to PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
-      # Optional: only if some services still need local MLflow setup for import-time registration
-      - name: Set up local MLflow tracking (for import-time model lookup)
+      # LA SEULE CHOSE QU'ON AJOUTE – 100 % magique, 0 modification ailleurs
+      - name: Create dummy MLflow model registry so imports don't crash
         run: |
-          mkdir -p ./mlruns
-          echo "MLFLOW_TRACKING_URI=file:$(pwd)/mlruns" >> $GITHUB_ENV
+          mkdir -p mlruns
+          cat > mlruns/meta.yaml <<'EOF'
+          artifact_uri: file:///home/runner/work/CallCenterAI/CallCenterAI/mlruns
+          experiment_id: "0"
+          lifecycle_stage: active
+          name: Default
+          EOF
+          
+          # Dummy registered models – couvre les 3 services existants
+          python -c "
+          import mlflow
+          from pathlib import Path
+          mlflow.set_tracking_uri('file://${{ github.workspace }}/mlruns')
+          
+          class Dummy:
+              def predict(self, x): return ['mock'] if isinstance(x, str) else ['mock'] * len(x)
+              def predict_proba(self, x): import numpy as np; return np.array([[0.1, 0.9]])
+              classes_ = ['mock_class']
+          
+          with mlflow.start_run():
+              mlflow.pyfunc.log_model('model', python_model=Dummy(), artifact_path='model')
+              run_id = mlflow.active_run().info.run_id
+          
+          # On enregistre les 3 modèles que ton code cherche
+          for name in ['tfidf_svm_ticket_classifier', 'CallCenterTransformer', 'agent_router']:
+              uri = f'runs:/{run_id}/model'
+              try:
+                  mlflow.register_model(uri, name)
+                  print(f'Registered dummy model: {name}')
+              except:
+                  pass
+          "
 
       - name: Run tests
         run: |
@@ -74,4 +104,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: junit
+          name: junit-${{ inputs.service-name }}-${{ matrix.mode }}
+          path: junit-*.xml
