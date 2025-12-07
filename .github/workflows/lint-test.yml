@@ -92,6 +92,8 @@ jobs:
         run: |
           mkdir -p mlruns
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
+      - name: Create empty mlruns folder (required by MLflow file store)
+        run: mkdir -p mlruns
 
       # Fix case-sensitive import for agent_Ai → agent_ai on Linux
       - name: Fix agent_ai import for CI
