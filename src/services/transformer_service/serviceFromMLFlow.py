@@ -126,7 +126,7 @@ async def predict(request: PredictRequest):
         inputs = tokenizer(clean_text_str, return_tensors="pt", truncation=True, padding=True, max_length=512)
         with torch.no_grad():
             outputs = hf_model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()[0]
+            probs = torch.softmax(outputs.logits, dim=1).numpy()[0]
         label_encoder = model._model_impl.python_model.label_encoder
         labels = label_encoder.classes_
         probabilities = {str(label): float(prob) for label, prob in zip(labels, probs)}

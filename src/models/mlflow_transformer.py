@@ -65,13 +65,11 @@ class TransformerWrapper(mlflow.pyfunc.PythonModel):
         try:
             texts = model_input["text"].tolist()
             print(f"[DEBUG] Predict called with {len(texts)} texts")
-            inputs = self.tokenizer(
-                texts, padding=True, truncation=True, return_tensors="pt", max_length=128
-            )
+            inputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=128)
             with torch.no_grad():
                 outputs = self.model(**inputs)
                 #cpu: on met le modèle dans la mémoire du processeur (RAM). Il sert à le rendre utilisable et enregistrable sur n’importe quelle machine, même sans GPU.
-                preds = torch.argmax(outputs.logits, dim=1).cpu().numpy()   #numpy to seul a un risque d’erreur si on a qu’un seul échantillon & risque de crash + incompatibilité avec MLflow donc on ajoute cpu
+                preds = torch.argmax(outputs.logits, dim=1).numpy()   #numpy to seul a un risque d’erreur si on a qu’un seul échantillon & risque de crash + incompatibilité avec MLflow donc on ajoute cpu
             labels = self.label_encoder.inverse_transform(preds)
             return labels.tolist()
         except Exception as e:
@@ -83,7 +81,7 @@ class TransformerWrapper(mlflow.pyfunc.PythonModel):
 # -----------------------------
 if __name__ == "__main__":
     try:
-        mlflow.set_tracking_uri("http://127.0.0.1:5000")
+        mlflow.set_tracking_uri("http://localhost:5000")
         mlflow.set_experiment("Transformer_Models")
 
         with mlflow.start_run(run_name=RUN_NAME) as run:

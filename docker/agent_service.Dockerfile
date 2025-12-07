@@ -1,13 +1,13 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-
+RUN mkdir -p src/services/agent_Ai
 RUN pip install --upgrade pip
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements/base.txt requirements/agent.txt  .
+RUN pip install --no-cache-dir -r base.txt -r agent.txt
 
-COPY src/services/agent_Ai ./src/services/agent_Ai
+COPY src/services/agent_Ai/appGPT.py ./src/services/agent_Ai
 
 EXPOSE 8000
 

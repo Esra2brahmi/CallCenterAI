@@ -1,4 +1,5 @@
-#>mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts --disable-security-middleware
+#->mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts --disable-security-middleware
+
 #ports externe : interne
 
 #version: "2.39.4"  # version recommandée du schéma Compose
@@ -31,10 +32,11 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
-    depends_on:
-      mlflow:
-        condition: service_healthy
+      - MLFLOW_TRACKING_URI=http://host.docker.internal:5000
+    # depends_on:
+    #   mlflow:
+    #     condition: service_healthy
+    
     networks:
       - callcenter-network
 
@@ -48,11 +50,13 @@ services:
     ports:
       - "8002:8000"   # accès externe à l'API agent
     environment:
-      - TRANSFORMERS_URL=http://transformerservice:8000
-      - TFIDF_URL=http://tfidf_service:8000
+      - TRANSFORMERS_URL=http://localhost:8001
+      - TFIDF_URL=http://localhost:8000
     depends_on:
-      - transformer_service
-      - tfidf_service
+      tfidf_service:
+        condition: service_healthy
+      transformer_service:
+        condition: service_healthy
       #- mlflow
     
     networks:

@@ -1,0 +1,5 @@
+# requirements/agent.txt
+transformers==4.56.2
+sentence-transformers==3.2.1
+torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
+# → distilgpt2 et all-MiniLM-L6-v2 sont téléchargés à la volée, pas besoin de plus

@@ -34,27 +34,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-v1-${{ inputs.service-name }}-${{ hashFiles('requirements/base.txt') }}-${{ hashFiles('requirements/${{ inputs.service-name }}.txt') || 'no-req' }}
-          restore-keys: |
-            pip-v1-${{ inputs.service-name }}-
-            pip-v1-
+          key: pip-v1-${{ hashFiles('requirements.txt') }}
+          restore-keys: pip-v1-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          
-          # Common dependencies
-          pip install -r requirements/base.txt
-          
-          # Service-specific (tfidf.txt, transformer.txt, agent.txt)
-          if [ -f "requirements/${{ inputs.service-name }}.txt" ]; then
-            echo "Installing requirements/${{ inputs.service-name }}.txt"
-            pip install -r requirements/${{ inputs.service-name }}.txt
-          else
-            echo "No specific requirements for ${{ inputs.service-name }}"
-          fi
-          
-          # Testing tools
+          pip install -r requirements.txt
           pip install pytest pytest-cov httpx
 
       - name: Train real models (integration only)
@@ -62,13 +48,12 @@ jobs:
         env:
           MLFLOW_TRACKING_URI: file:./mlruns
         run: |
-          echo "Training model for ${{ inputs.service-name }} (integration tests)"
+          echo "Training model for ${{ inputs.service-name }}"
           case "${{ inputs.service-name }}" in
             tfidf)       python -m src.models.mlflow_tfidf ;;
             transformer) python -m src.models.mlflow_transformer ;;
-            agent_ai)    python -m src.services.agent_ai.train_router ;;
-            agent)       python -m src.services.agent_ai.train_router ;;  # fallback
-            *)           echo "No training step defined" ;;
+            agent_ai|agent) python -m src.services.agent_ai.train_router ;;
+            *)           echo "No training step" ;;
           esac
 
       - name: Run tests

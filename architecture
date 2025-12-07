@@ -1,44 +1,73 @@
 CallCenterAI/
-├── data/                  # Géré par DVC pour les datasets
-│   └── raw/               # Dataset brut de Kaggle
-├── models/                # Modèles sauvegardés via MLflow
-├── src/                   # Code source principal
-│   ├── data/              # Scripts de préparation des données
-│   │   └── prepare.py     # Script pour préparer le dataset
-│   ├── train/             # Scripts d'entraînement
-│   │   ├── train_tfidf_svm.py
-│   │   └── train_transformer.py
-│   ├── services/          # Services FastAPI
-│   │   ├── tfidf_svc/     # Service pour TF-IDF + SVM
-│   │   │   ├── app.py
-│   │   │   └── requirements.txt
-│   │   ├── transformer_svc/
-│   │   │   ├── app.py
-│   │   │   └── requirements.txt
-│   │   └── agent/
-│   │       ├── app.py
-│   │       ├── utils.py   # Fonctions utilitaires (scrub PII, détection langue)
-│   │       └── requirements.txt
-│   └── tests/             # Tests unitaires et d'intégration
-│       ├── test_data.py
-│       ├── test_train.py
-│       ├── test_services.py
-│       └── test_agent.py
-├── docker/                # Fichiers Docker
-│   ├── tfidf_svc.Dockerfile
-│   ├── transformer_svc.Dockerfile
-│   ├── agent.Dockerfile
-│   └── docker-compose.yml
-├── monitoring/            # Configurations monitoring
-│   ├── prometheus.yml
-│   └── grafana/           # Dashboards Grafana (JSON exportés)
-├── .github/workflows/     # CI/CD GitHub Actions
-│   └── ci-cd.yml
-├── dvc.yaml               # Pipeline DVC
-├── params.yaml            # Hyperparamètres pour DVC/MLflow
-├── requirements.txt       # Dépendances globales
-├── .gitignore             # Ignorer data/, models/, etc.
-├── .dvcignore             # Pour DVC
-├── mlflow/                # Dossier pour MLflow tracking (géré localement)
-├── README.md              # Instructions détaillées
-└── rapport_mlflow.md      # Rapport généré à partir de MLflow
+├─ .github/
+│  └─ workflows/
+│     ├─ lint-test.yml
+│     ├─ docker-build.yml
+│     ├─ ci-agent.yml
+│     ├─ ci-transformer.yml
+│     └─ ci-tfidf.yml
+├─ docker/
+│  ├─ tfidf_svc.Dockerfile
+│  ├─ transformersService.Dockerfile
+│  ├─ agent_service.Dockerfile
+│  └─ docker-compose.override.yml
+├─ src/
+|  └─ models/
+│  |   ├─ mlflow_tfidf.py              # MLflow model loader for TF-IDF + SVM
+│  |   └─ mlflow_transformer.py        # MLflow model loader for transformers
+│  |    
+│  |   
+│  └─ services/
+│     ├─ tfidf_service/
+│     │  ├─ __init__.py
+│     │  ├─ app.py                   # FastAPI app + endpoints
+│     │  
+│     │  
+│     │  
+│     ├─ transformer_service/
+│     │  ├─ __init__.py
+│     │  ├─ serviceFromMLFlow.py     # FastAPI app + transformer inference
+│     │  
+│     │  
+│     └─ agent_Ai/
+│        ├─ __init__.py
+│        ├─ appGPT.py                 # fast api  service
+│        ├─ generate_router_training.py                   
+│        └─ train_router.py                  # to train model  
+│        
+├─ scripts/
+│  ├─ train_tfidf.py                # training pipeline for TF-IDF + SVM
+│  ├─ train_transformer.py          # fine-tune/pack transformer model
+│  └─ serve_local_mlflow.sh
+├─ requirements/
+│  ├─ base.txt
+│  ├─ transformer.txt
+│  └─ dev.txt
+├─ tests/
+│  ├─ unit/
+│  │  ├─ test_tfidf_preprocessing.py
+│  │  ├─ test_transformer_loader.py
+│  │  └─ test_agent_logic.py
+│  └─ integration/
+│     └─ test_integration.py        # integration tests using TestClient
+├─ notebooks/
+│  ├─ eda.ipynb
+│  └─ model_experiments.ipynb
+├─ models/                          # local exported model artifacts
+│  ├─ tfidf/
+│  └─ transformer/
+├─ mlruns/                          # MLflow runs / registry (local)
+├─ data/
+│  ├─ raw/
+│  ├─ processed/
+│  └─ README.md
+├─ dvc.yaml
+├─ params.yaml
+├─ .dvc/
+├─ docker-compose.yml
+├─ .env.example
+├─ .gitignore
+├─ .dockerignore
+├─ Makefile
+├─ README.md
+└─ architecture                      # high-level architecture doc
