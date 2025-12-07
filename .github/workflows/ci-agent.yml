@@ -1,4 +1,3 @@
-# .github/workflows/ci-agent.yml
 name: CI – Agent AI Service
 on:
   push:

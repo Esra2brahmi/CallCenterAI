@@ -1,4 +1,3 @@
-# .github/workflows/ci-tfidf.yml
 name: CI – TF-IDF Service
 on:
   push:
