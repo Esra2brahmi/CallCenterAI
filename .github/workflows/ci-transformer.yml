@@ -1,10 +1,11 @@
-# .github/workflows/ci-transformer.yml
 name: CI – Transformer Service
+
 on:
   push:
     paths:
       - 'src/services/transformer_service/**'
-      - '.github/workflows/lint-test.yml'
+      - 'scripts/train_transformer.py'
+      - 'requirements/**'
   pull_request:
   workflow_dispatch:
 
@@ -14,7 +15,7 @@ jobs:
     with:
       service-path: src/services/transformer_service
       service-name: transformer
-      needs-real-model: false     # no training script yet → fast tests only
+      needs-real-model: false   # change to true later when you train in CI
 
   build:
     needs: test

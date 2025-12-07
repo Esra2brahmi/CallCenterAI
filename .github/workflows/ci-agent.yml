@@ -1,10 +1,10 @@
-# .github/workflows/ci-agent.yml
 name: CI – Agent AI Service
+
 on:
   push:
     paths:
       - 'src/services/agent_Ai/**'
-      - '.github/workflows/lint-test.yml'
+      - 'requirements/**'
   pull_request:
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ jobs:
     with:
       service-path: src/services/agent_Ai
       service-name: agent
-      needs-real-model: false     # agent has no heavy model to train
+      needs-real-model: false
 
   build:
     needs: test
