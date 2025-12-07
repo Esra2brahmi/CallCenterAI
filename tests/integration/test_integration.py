@@ -4,6 +4,9 @@ from src.services.tfidf_service.app import app as tfidf_app
 from src.services.transformer_service.serviceFromMLFlow import app as transformer_app
 from src.services.agent_Ai.appGPT import app as agent_app
 
+import os
+os.environ["MLFLOW_TRACKING_URI"] = os.environ.get("MLFLOW_TRACKING_URI", "file:./mlruns")  # CI fix
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_tfidf_full_flow():

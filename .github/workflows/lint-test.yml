@@ -49,11 +49,11 @@ jobs:
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # LA SEULE CHOSE QU'ON AJOUTE – 100 % magique, 0 modification ailleurs
-      - name: Setup dummy MLflow registry + fake models (100% working – 2025 proof)
+      - name: Setup dummy MLflow registry + register fake models (WORKS 100%)
         run: |
           set -euo pipefail
 
-          # 1. Crée le répertoire + experiment 0
+          # 1. Crée mlruns + experiment 0
           mkdir -p mlruns/0
           cat > mlruns/0/meta.yaml <<EOF
           experiment_id: 0
@@ -62,49 +62,42 @@ jobs:
           artifact_location: file://${{ github.workspace }}/mlruns/0
           EOF
 
-          # 2. Crée un modèle dummy pyfunc valide + enregistre les deux modèles nécessaires
+          # 2. Crée un run + log + register les deux modèles EXACTEMENT comme ton code les attend
           python - <<'PY'
           import mlflow
           import mlflow.pyfunc
-          import numpy as np
+          from pathlib import Path
           import os
 
           mlflow.set_tracking_uri(f"file://{os.getenv('GITHUB_WORKSPACE')}/mlruns")
 
-          # Classe valide pour mlflow.pyfunc
+          # Dummy model valide (hérite de PythonModel)
           class DummyModel(mlflow.pyfunc.PythonModel):
               def predict(self, context, model_input):
-                  if isinstance(model_input, str):
-                      return ["mock"]
-                  elif hasattr(model_input, '__len__') and len(model_input) > 0 and isinstance(model_input[0], str):
-                      return ["mock"] * len(model_input)
-                  else:
-                      return ["mock"]
+                  return ["mock_topic"]
 
           with mlflow.start_run(experiment_id="0") as run:
               run_id = run.info.run_id
+              artifact_uri = run.info.artifact_uri
 
-              # Log du modèle dummy (nom correct pour éviter le warning)
               mlflow.pyfunc.log_model(
                   artifact_path="model",
-                  python_model=DummyModel(),
-                  registered_model_name="dummy_for_ci_only"  # on log sous un nom temporaire
+                  python_model=DummyModel()
               )
 
-              # Enregistrement direct des deux modèles que ton code cherche
               client = mlflow.MlflowClient()
-              model_names = ["tfidf_svm_ticket_classifier", "CallCenterTransformer"]
 
-              for name in model_names:
+              # Enregistre les deux modèles que ton code cherche VRAIMENT
+              for name in ["tfidf_svm_ticket_classifier", "CallCenterTransformer"]:
                   try:
                       client.create_registered_model(name)
                   except:
-                      pass  # déjà existe
+                      pass
 
-                  # Enregistre depuis le run
+                  # Crée la version et passe direct en Production
                   mv = client.create_model_version(
                       name=name,
-                      source=f"{run.info.artifact_uri}/model",
+                      source=f"{artifact_uri}/model",
                       run_id=run_id
                   )
                   client.transition_model_version_stage(
@@ -113,7 +106,7 @@ jobs:
                       stage="Production",
                       archive_existing_versions=True
                   )
-                  print(f"Dummy model registered: {name} v{mv.version} → Production")
+                  print(f"Registered & Production: {name} v{mv.version}")
           PY
 
           echo "MLFLOW_TRACKING_URI=file://${{ github.workspace }}/mlruns" >> $GITHUB_ENV
