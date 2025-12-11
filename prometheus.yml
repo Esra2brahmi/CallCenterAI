@@ -1,20 +1,19 @@
 global:
   scrape_interval: 10s
-  evaluation_interval: 10s
 
 scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'agentservice'
-    static_configs:
-      - targets: ['agentservice:8000']          # container name, resolved by Docker network
+  # - job_name: 'agentservice'
+  #   static_configs:
+  #     - targets: ['agent_service:8000']
 
-  - job_name: 'transformers_service'
-    static_configs:
-      - targets: ['transformers_service:8000']
+  # - job_name: 'transformers_service'
+  #   static_configs:
+  #     - targets: ['transformer_service:8000']
 
   - job_name: 'tfidf_svc'
     static_configs:
-      - targets: ['tfidf_svc:8000']
+      - targets: ['tfidf_service:8000']

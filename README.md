@@ -1,268 +1,249 @@
-# CallCenterAI: Intelligent Customer Ticket Classification System
+CallCenterAI – Intelligent Customer Ticket Classification System
 
-### Architecture Diagram
-```mermaid
+
+
+
+
+
+📖 Description
+
+CallCenterAI est une solution MLOps complète pour la classification automatique des tickets clients (emails, chat, téléphone) en différentes catégories métiers (ex. Facturation, Problème technique, Accès compte, etc.).
+
+Le projet intègre :
+
+Deux approches NLP :
+
+TF-IDF + SVM (scikit-learn)
+
+Transformer (Hugging Face – multilingue FR/EN/AR)
+
+Microservices FastAPI pour chaque modèle et un agent IA pour orchestrer les prédictions.
+
+Conteneurisation avec Docker et orchestration via Docker Compose.
+
+Pipeline MLOps complet avec MLflow, DVC, CI/CD GitHub Actions.
+
+Monitoring et observabilité avec Prometheus et Grafana.
+
+🏗 Architecture
 graph TB
-    USER[Customer Support Agent] --> AGENT[Intelligent Agent API]
-    AGENT --> PII[PII Scrubber]
-    PII --> ROUTER[Model Router]
-    
-    ROUTER -->|Simple/Fast| TFIDF[TF-IDF + SVM Service]
-    ROUTER -->|Complex/Multilingual| TRANSFORMER[Transformer Service]
-    
-    TFIDF --> MLFLOW[(MLflow Registry)]
-    TRANSFORMER --> MLFLOW
-    
-    MLFLOW --> TRAINING[Training Pipeline]
-    TRAINING --> DVC[DVC Pipeline]
-    DVC --> DATASET[(Kaggle Dataset<br/>47K Tickets)]
-    
-    AGENT --> PROMETHEUS[Prometheus]
-    TFIDF --> PROMETHEUS
-    TRANSFORMER --> PROMETHEUS
-    PROMETHEUS --> GRAFANA[Grafana Dashboard]
-    
-    GITHUB[GitHub] --> ACTIONS[GitHub Actions CI/CD]
-    ACTIONS -->|Test & Lint| PYTEST[pytest + black + flake8]
-    ACTIONS -->|Security Scan| TRIVY[Trivy + Bandit]
-    ACTIONS -->|Build & Push| DOCKER[Docker Registry]
-    DOCKER --> COMPOSE[Docker Compose Deployment]
-```
+    User[Client/Ticket Submission] --> Agent[AI Agent Service]
+    Agent --> TFIDF[TF-IDF + SVM Service]
+    Agent --> Transformer[Transformer Service]
+    TFIDF --> MLflow_TFIDF[MLflow Tracking]
+    Transformer --> MLflow_Transformer[MLflow Tracking]
+    MLflow_TFIDF --> DVC[DVC Pipeline]
+    MLflow_Transformer --> DVC
+    Prometheus --> Grafana[Dashboard Grafana]
 
----
 
-## ✨ Overview
-CallCenterAI is a production-grade MLOps system that automatically classifies customer service tickets (emails, chat, phone) into business categories using dual NLP approaches. The system features an intelligent routing agent that dynamically selects between classical ML and deep learning models based on query complexity, language, and confidence scores.
+Structure du dépôt :
 
-The platform delivers:
+CallCenterAI/
+CallCenterAI/
+├─ .github/
+│  └─ workflows/
+│     ├─ lint-test.yml
+│     ├─ docker-build.yml
+│     ├─ ci-agent.yml
+│     ├─ ci-transformer.yml
+│     └─ ci-tfidf.yml
+├─ docker/
+│  ├─ tfidf_svc.Dockerfile
+│  ├─ transformersService.Dockerfile
+│  ├─ agent_service.Dockerfile
+│  └─ docker-compose.override.yml
+├─ src/
+|  └─ models/
+│  |   ├─ mlflow_tfidf.py              # MLflow model loader for TF-IDF + SVM
+│  |   └─ mlflow_transformer.py        # MLflow model loader for transformers
+│  |    
+│  |   
+│  └─ services/
+│     ├─ tfidf_service/
+│     │  ├─ __init__.py
+│     │  ├─ app.py                   # FastAPI app + endpoints
+│     │  
+│     │  
+│     │  
+│     ├─ transformer_service/
+│     │  ├─ __init__.py
+│     │  ├─ serviceFromMLFlow.py     # FastAPI app + transformer inference
+│     │  
+│     │  
+│     └─ agent_Ai/
+│        ├─ __init__.py
+│        ├─ appGPT.py                 # fast api  service
+│        ├─ generate_router_training.py                   
+│        └─ train_router.py                  # to train model  
+│        
+├─ scripts/
+│  ├─ train_tfidf.py                # training pipeline for TF-IDF + SVM
+│  ├─ train_transformer.py          # fine-tune/pack transformer model
+│  └─ serve_local_mlflow.sh
+├─ requirements/
+│  ├─ base.txt
+│  ├─ transformer.txt
+│  └─ dev.txt
+├─ tests/
+│  ├─ unit/
+│  │  ├─ test_tfidf_preprocessing.py
+│  │  ├─ test_transformer_loader.py
+│  │  └─ test_agent_logic.py
+│  └─ integration/
+│     └─ test_integration.py        # integration tests using TestClient
+├─ notebooks/
+│  ├─ eda.ipynb
+│  └─ model_experiments.ipynb
+├─ models/                          # local exported model artifacts
+│  ├─ tfidf/
+│  └─ transformer/
+├─ mlruns/                          # MLflow runs / registry (local)
+├─ data/
+│  ├─ raw/
+│  ├─ processed/
+│  └─ README.md
+├─ dvc.yaml
+├─ params.yaml
+├─ .dvc/
+├─ docker-compose.yml
+├─ .env.example
+├─ .gitignore
+├─ .dockerignore
+├─ Makefile
+├─ README.md
+└─ architecture                      
 
-- **Dual-model architecture** with TF-IDF+SVM for speed and DistilBERT for accuracy
-- **Intelligent routing agent** with PII scrubbing and model selection logic
-- **Complete MLOps lifecycle** with experiment tracking, model registry, and versioning
-- **Production-ready deployment** with Docker containerization and orchestration
-- **Automated CI/CD pipeline** with testing, linting, and security scanning
-- **Real-time monitoring** with Prometheus metrics and Grafana dashboards
+⚡ Fonctionnalités
 
----
+Agent IA intelligent :
 
-## 🎯 Key Features
+Sélection du modèle approprié (TF-IDF ou Transformer)
 
-### 🤖 Intelligent Routing Agent
-- Analyzes incoming tickets for language, complexity, and length
-- Routes simple queries to TF-IDF+SVM for sub-100ms response times
-- Directs complex/multilingual cases to Transformer for higher accuracy
-- Scrubs PII (names, emails, phone numbers) before model inference
-- Returns predictions with confidence scores and routing explanations
-- Exposes Prometheus metrics for observability
+Nettoyage des données sensibles (Scrub PII)
 
-### 🧠 Dual NLP Models
-**TF-IDF + SVM (Classical ML)**
-- Fast inference optimized for high-throughput scenarios
-- Calibrated probability outputs via CalibratedClassifierCV
-- Handles 8+ ticket categories (Hardware, HR, Access, Storage, etc.)
-- Sub-second prediction latency
+Retourne la prédiction et la confiance avec explication
 
-**DistilBERT Transformer (Deep Learning)**
-- Fine-tuned on `distilbert-base-multilingual-cased` (104 languages)
-- Handles French, English, Arabic text seamlessly
-- Superior accuracy on nuanced or ambiguous tickets
-- Trained on 47K labeled IT service tickets from Kaggle
+Expose des métriques Prometheus
 
-### 🔄 MLOps Pipeline
-- **DVC**: Version control for datasets and training pipelines
-- **MLflow**: Experiment tracking, hyperparameter logging, model registry
-- **Model Registry**: Production/Staging environments with rollback capability
-- **Pipeline Automation**: `dvc.yaml` defines reproducible training workflows
+TF-IDF + SVM :
 
-### 🐳 Containerized Microservices
-- **3 FastAPI services**: Agent, TF-IDF, Transformer (isolated containers)
-- **MLflow Server**: Centralized experiment tracking UI
-- **Prometheus + Grafana**: Metrics collection and visualization
-- **Docker Compose**: One-command deployment of entire stack
+Pipeline Scikit-learn
 
-### 🔐 CI/CD & Quality Assurance
-- **GitHub Actions**: Automated testing on every push/PR
-- **Code Quality**: `black`, `flake8`, `isort` for linting
-- **Testing**: `pytest` with unit and integration tests
-- **Security Scanning**: `Trivy` (container vulnerabilities), `Bandit` (Python security)
-- **Automated Builds**: Docker images built and pushed to registry
+Probabilités calibrées
 
-### 📊 Monitoring & Observability
-- **Prometheus Metrics**: Request latency, throughput, error rates per service
-- **Grafana Dashboards**: Real-time visualization of system health
-- **Model Performance Tracking**: Accuracy, F1-score, confusion matrices in MLflow
-- **Alerting**: (Configurable) Slack/Email alerts for anomalies
+Logging métriques dans MLflow
 
----
+Transformer Multilingue :
 
-## 🏗️ System Architecture
+Fine-tuning avec Hugging Face
 
-### Service Topology
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Load Balancer / API Gateway              │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-                ┌───────────▼───────────┐
-                │  Intelligent Agent    │
-                │  (PII + Routing)      │
-                └───┬───────────────┬───┘
-                    │               │
-        ┌───────────▼──┐       ┌───▼──────────────┐
-        │  TF-IDF+SVM  │       │  Transformer     │
-        │  Service     │       │  Service         │
-        └──────┬───────┘       └────────┬─────────┘
-               │                        │
-               └────────┬───────────────┘
-                        │
-            ┌───────────▼───────────┐
-            │  PostgreSQL + MLflow  │
-            │  Model Registry       │
-            └───────────────────────┘
-```
+Prise en charge du français, anglais et arabe
 
-### Data Flow
-1. **Ticket Ingestion**: Customer support agent submits ticket via API
-2. **PII Scrubbing**: Agent removes sensitive information (regex + NER)
-3. **Model Selection**: Router analyzes query complexity and confidence
-4. **Inference**: Selected model generates classification
-5. **Response**: Returns category, confidence, and routing rationale
-6. **Monitoring**: Logs metrics to Prometheus, stores in MLflow
+MLOps :
 
----
+DVC pour pipeline data/model
 
-## 🚀 Technology Stack
+MLflow pour suivi des runs et registry
 
-### Machine Learning
-- **scikit-learn** - TF-IDF vectorization, SVM, calibration
-- **Hugging Face Transformers** - DistilBERT fine-tuning
-- **PyTorch** - Deep learning backend
-- **Pandas & NumPy** - Data manipulation
+CI/CD via GitHub Actions (tests, lint, build, push Docker images)
 
-### MLOps & Deployment
-- **MLflow** - Experiment tracking, model registry, versioning
-- **DVC** - Data and pipeline version control
-- **Docker & Docker Compose** - Containerization and orchestration
-- **FastAPI** - High-performance async API framework
-- **Uvicorn** - ASGI server for FastAPI
+Monitoring :
 
-### Monitoring & Observability
-- **Prometheus** - Metrics collection and alerting
-- **Grafana** - Visualization and dashboards
-- **prometheus-fastapi-instrumentator** - Auto-instrumentation
+Dashboard Grafana (latence, requêtes, erreurs)
 
-### CI/CD & Quality
-- **GitHub Actions** - Automated workflows
-- **pytest** - Unit and integration testing
-- **black, flake8, isort** - Code formatting and linting
-- **Trivy** - Container security scanning
-- **Bandit** - Python security linter
+Prometheus scraping endpoints /metrics
 
-### Data & Storage
-- **PostgreSQL** - MLflow backend store
-- **Kaggle API** - Dataset download automation
+🚀 Installation et Lancement
 
----
+Cloner le dépôt :
 
-## ⚡ Quick Start
+git clone https://github.com/maryem38/CallCenterAI.git
+cd CallCenterAI
 
-### Prerequisites
-- Docker & Docker Compose (v2.0+)
-- Python 3.11+
-- Git & DVC
-- Kaggle API credentials (for dataset)
 
-### Installation
+Configurer l’environnement :
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/yourusername/callcenterai.git
-cd callcenterai
-
-# 2. Set up environment variables
 cp .env.example .env
-# Edit .env with your MLflow, Prometheus, and Kaggle credentials
+--> pip install requirements.txt/
 
-# 3. Download and prepare dataset
-dvc pull  # Or manually download from Kaggle
-python scripts/prepare_data.py
+Construire les images Docker : docker-compose build
 
-# 4. Train models (optional - pre-trained models included)
-dvc repro  # Runs entire training pipeline
-# OR
-python src/train_tfidf.py
-python src/train_transformer.py
 
-# 5. Start all services
+Lancer les services :
+
 docker-compose up -d
 
-# 6. Verify services are running
-docker-compose ps
 
-# Services will be available at:
-# - Agent API: http://localhost:8000
-# - TF-IDF Service: http://localhost:8001
-# - Transformer Service: http://localhost:8002
-# - MLflow UI: http://localhost:5000
-# - Grafana: http://localhost:3000
-# - Prometheus: http://localhost:9090
-```
+Accéder aux APIs :
 
----
+TF-IDF Service : http://localhost:8001/predict
 
-## 📖 Usage Guide
+Transformer Service : http://localhost:8002/predict
 
-### Training Models
+Agent IA : http://localhost:8000/predict
 
-```bash
-# Train TF-IDF + SVM
-python src/train_tfidf.py --data data/tickets.csv --experiment tfidf_v1
+Accéder au monitoring :
 
-# Fine-tune Transformer
-python src/train_transformer.py \
-  --model distilbert-base-multilingual-cased \
-  --epochs 3 \
-  --batch-size 16 \
-  --experiment transformer_v1
+Prometheus : http://localhost:9090
 
-# View experiments in MLflow
-mlflow ui --backend-store-uri sqlite:///mlflow.db
-```
-
----
-
-## 📊 Model Performance
-
-### TF-IDF + SVM
-| Metric | Score |
-|--------|-------|
-| Accuracy | 87.3% |
-| F1-Score (Weighted) | 86.9% |
-| Avg Inference Time | 12ms |
-| Throughput | ~80 req/sec |
-
-### DistilBERT Transformer
-| Metric | Score |
-|--------|-------|
-| Accuracy | 92.7% |
-| F1-Score (Weighted) | 92.1% |
-| Avg Inference Time | 45ms |
-| Throughput | ~22 req/sec |
-
-### Category Breakdown
-| Category | TF-IDF F1 | Transformer F1 |
-|----------|-----------|----------------|
-| Hardware | 0.89 | 0.94 |
-| HR Support | 0.85 | 0.91 |
-| Access | 0.88 | 0.93 |
-| Storage | 0.84 | 0.89 |
-| Purchase | 0.86 | 0.90 |
-
----
+Grafana : http://localhost:3000
 
 
 
 
+CI/CD GitHub Actions gère le linting (black, flake8, isort) et le scan sécurité (Trivy, Bandit).
 
+📊 Dataset
 
+Source : IT Service Ticket Classification – Kaggle
 
+Taille : ~47 000 tickets
+
+Colonnes : Document (texte du ticket), Topic_group (catégorie)
+
+Catégories : Hardware, HR Support, Access, Miscellaneous, Storage, Purchase, etc.
+
+🛠 Stack Technologique
+
+Langage : Python 3.11
+
+API Framework : FastAPI
+
+ML/NLP : scikit-learn (TF-IDF + SVM), Hugging Face Transformers
+
+MLOps : MLflow, DVC, Docker, Docker Compose, GitHub Actions
+
+Monitoring : Prometheus, Grafana
+
+Tests & Qualité : pytest
+
+📈 Pipeline MLOps
+
+Préparation des données (dvc.yaml)
+
+Entraînement TF-IDF + SVM (src/models/mlflow_tfidf.py)
+
+Fine-tuning Transformer (src/models/mlflow_transformer.py)
+
+Déploiement via Docker & Docker Compose  (docker-compose up --build)
+
+Suivi des métriques et modèles dans MLflow (mlflow server --host 0.0.0.0 --port 5000 --serve-artifacts --disable-security-middleware)
+
+Monitoring et alertes via Prometheus/Grafana
+
+📄 Références
+
+FastAPI Documentation
+
+scikit-learn Documentation
+
+Hugging Face Transformers
+
+MLflow
+
+DVC
+
+Prometheus
+
+Grafana

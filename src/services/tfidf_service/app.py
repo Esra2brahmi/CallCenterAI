@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import string
+import time
 from typing import Dict
 
 import joblib
@@ -10,6 +11,22 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 from nltk.corpus import stopwords
+from prometheus_client import Counter, Histogram
+
+
+
+PREDICTIONS_TOTAL = Counter(
+    "ml_predictions_total",
+    "Nombre total de prédictions effectuées",
+    ["service", "model", "predicted_label"]
+)
+
+PREDICTION_LATENCY = Histogram(
+    "ml_prediction_latency_seconds",
+    "Latence de la prédiction uniquement (hors FastAPI overhead)",
+    ["service", "model"]
+)
+
 
 # ==========================================================
 # FORCER MLFLOW À UTILISER DES CHEMINS RELATIFS (LA LIGNE MAGIQUE)
@@ -120,11 +137,17 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=400, detail="Le champ 'text' ne peut pas être vide")
 
     cleaned = clean_text(request.text)
+    start = time.time()
 
     try:
         probas = model.predict_proba([cleaned])[0]
         pred_idx = probas.argmax()
         predicted_label = model.classes_[pred_idx]
+
+        # MÉTRIQUES CUSTOM
+        PREDICTIONS_TOTAL.labels(service="tfidf_svc", model=MODEL_NAME, predicted_label=predicted_label).inc()
+        PREDICTION_LATENCY.labels(service="tfidf_svc", model=MODEL_NAME).observe(time.time() - start)
+
         prob_dict = {str(cls): float(p) for cls, p in zip(model.classes_, probas)}
 
         return PredictionResponse(

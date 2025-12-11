@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentAI - Call Center Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 13px;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .input-section {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 20px 30px;
+            border-bottom: 2px solid #f0f0f0;
+            z-index: 50;
+        }
+
+        .results-area {
+            padding: 30px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            max-height: 150px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .clear-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .prediction-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .confidence-badge {
+            background: #10b981;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-item-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .result-item-value {
+            font-size: 15px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .response-section {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            border-left: 4px solid #10b981;
+        }
+
+        .response-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .response-text {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .error {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c33;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .model-info {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AgentAI Call Center Assistant</h1>
+            <p>Intelligent Ticket Classification & Response System</p>
+        </div>
+
+        <div class="content">
+            <div class="input-section">
+                <label for="userInput">Enter your support ticket or question:</label>
+                <textarea
+                    id="userInput"
+                    placeholder="Example: I need access to the HR modules for reporting and cost analysis. Thank you very much."
+                ></textarea>
+
+                <div class="button-container" style="margin-top: 12px;">
+                    <button class="submit-btn" onclick="processText()">Analyze & Respond</button>
+                    <button class="clear-btn" onclick="clearAll()">Clear</button>
+                </div>
+            </div>
+
+            <div class="results-area">
+                <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Processing your request...</p>
+            </div>
+
+            <div id="error" class="error hidden"></div>
+
+            <div id="result" class="result-section hidden">
+                <div class="result-header">
+                    <span class="prediction-badge" id="prediction">-</span>
+                    <span class="confidence-badge" id="confidence">-</span>
+                </div>
+
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="result-item-label">Classification Confidence</div>
+                        <div class="result-item-value" id="classificationConfidence">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-item-label">Semantic Confidence</div>
+                        <div class="result-item-value" id="semanticConfidence">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-item-label">Model Used</div>
+                        <div class="result-item-value" id="modelUsed">-</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-item-label">Explanation</div>
+                        <div class="result-item-value" id="explanation">-</div>
+                    </div>
+                </div>
+
+                <div class="response-section">
+                    <div class="response-label">Generated Response</div>
+                    <div class="response-text" id="generatedResponse">-</div>
+                </div>
+
+                <div class="response-section" style="border-left-color: #667eea;">
+                    <div class="response-label">Processed Text (PII Scrubbed)</div>
+                    <div class="response-text" id="scrubbedText">-</div>
+                </div>
+
+                <div class="model-info" id="modelInfo">-</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8002/predict';
+
+        async function processText() {
+            const input = document.getElementById('userInput').value.trim();
+
+            if (!input) {
+                showError('Please enter some text to analyze.');
+                return;
+            }
+
+            // Hide previous results and errors
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+
+            // Disable button during processing
+            const submitBtn = document.querySelector('.submit-btn');
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: input })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                showError(`Error: ${error.message}. Make sure the AgentAI service is running on port 8002.`);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            // Update prediction and confidence
+            document.getElementById('prediction').textContent = data.prediction || 'N/A';
+            document.getElementById('confidence').textContent =
+                data.confidence ? (data.confidence * 100).toFixed(1) + '%' : 'N/A';
+
+            // Update detailed metrics
+            document.getElementById('classificationConfidence').textContent =
+                data.classification_confidence ? (data.classification_confidence * 100).toFixed(1) + '%' : 'N/A';
+            document.getElementById('semanticConfidence').textContent =
+                data.semantic_confidence ? (data.semantic_confidence * 100).toFixed(1) + '%' : 'N/A';
+            document.getElementById('modelUsed').textContent = data.model_used || 'N/A';
+            document.getElementById('explanation').textContent = data.explanation || 'N/A';
+
+            // Update response and scrubbed text
+            document.getElementById('generatedResponse').textContent =
+                data.generated_response || 'No response generated';
+            document.getElementById('scrubbedText').textContent =
+                data.scrubbed_text || data.text || 'N/A';
+
+            // Show result section
+            document.getElementById('result').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function clearAll() {
+            document.getElementById('userInput').value = '';
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        // Allow Enter key to submit (with Shift+Enter for new line)
+        document.getElementById('userInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                processText();
+            }
+        });
+    </script>
+</body>
+</html>

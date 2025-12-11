@@ -1,3 +1,4 @@
+# log_transformer_model.py
 import os
 import sys
 import mlflow
@@ -6,125 +7,135 @@ import torch
 import joblib
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from sklearn.metrics import accuracy_score, f1_score
-from mlflow.pyfunc import PythonModelContext
+from mlflow.models import infer_signature
+from mlflow.types.schema import Schema, ColSpec
 
 # -----------------------------
 # CONFIG
 # -----------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../models/transformer_model"))
-RUN_NAME = "transformer_model_run"
+RUN_NAME = "transformer_model_run_v2"
+MODEL_NAME = "CallCenterTransformer"
 
 
-
-print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
-print(f"[DEBUG] MODEL_DIR: {MODEL_DIR}")
-
-# -----------------------------
-# SAFETY CHECKS
-# -----------------------------
 required_files = [
     "config.json",
-    "model.safetensors",
+    "model.safetensors",  # ou pytorch_model.bin
     "tokenizer_config.json",
     "tokenizer.json",
     "vocab.txt",
     "special_tokens_map.json",
     "label_encoder.pkl",
 ]
-missing = [f for f in required_files if not os.path.exists(os.path.join(MODEL_DIR, f))] 
+
+missing = [f for f in required_files if not os.path.exists(os.path.join(MODEL_DIR, f))]
 if missing:
-    print(f"[ERROR] Missing files in model directory: {missing}")
+    print(f"[ERROR] Fichiers manquants dans {MODEL_DIR} : {missing}")
     sys.exit(1)
 
-print("[DEBUG] All model files found ✅")
+print("[DEBUG] Tous les fichiers du modèle sont présents")
 
 # -----------------------------
-# DEFINE CUSTOM PYFUNC MODEL
+# CUSTOM PYFUNC WRAPPER (FIXED & ROBUST)
 # -----------------------------
 class TransformerWrapper(mlflow.pyfunc.PythonModel):
-    # ---------------------------------------
-        #Charger un modèle MLflow en production
-    # ---------------------------------------
-    # j'ai remplaceé artifact_path=None (chemin obsolète) par load_context(self, context: PythonModelContext) (contienne des instruction qui vont automatiquement charger les artefacts depuis leurs emplacements MLflow corrects):
-    def load_context(self, context: PythonModelContext):
-        try:
-            print("[DEBUG] Loading model artifacts inside pyfunc context...")
-            model_path = context.artifacts["transformer_model"]   # coorectio: context.artifacts aulieu de artifacts_path if artifacts_path else self.artifacts["transformer_model"]
-            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-            self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
-            self.label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
-            self.model.eval()
-            print("[DEBUG] Model + Tokenizer + LabelEncoder loaded successfully ✅")
-        except Exception as e:
-            print(f"[ERROR] Failed during load_context(): {e}")
-            raise e
+    def load_context(self, context):
+        print("[DEBUG] Chargement des artefacts via MLflow context...")
+        
+        # Chemin vers le dossier du modèle Hugging Face
+        model_path = context.artifacts["transformer_model"]
 
-    def predict(self, context, model_input: pd.DataFrame):
-        try:
+        # FORCE LEGACY ATTENTION → Évite l'erreur DistilBertSdpaAttention en prod !
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_path,
+            torch_dtype=torch.float32,
+            low_cpu_mem_usage=True,
+            attn_implementation="eager"  # CLÉ MAGIQUE : désactive SDPA (né en 4.36+
+        )
+        
+        # Charger le label encoder
+        self.label_encoder = joblib.load(os.path.join(model_path, "label_encoder.pkl"))
+        
+        self.model.eval()
+        print("[SUCCESS] Modèle, tokenizer et label_encoder chargés avec succès")
+
+    def predict(self, context, model_input):
+        # Supporte DataFrame ou list/str
+        if isinstance(model_input, pd.DataFrame):
             texts = model_input["text"].tolist()
-            print(f"[DEBUG] Predict called with {len(texts)} texts")
-            inputs = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=128)
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                #cpu: on met le modèle dans la mémoire du processeur (RAM). Il sert à le rendre utilisable et enregistrable sur n’importe quelle machine, même sans GPU.
-                preds = torch.argmax(outputs.logits, dim=1).numpy()   #numpy to seul a un risque d’erreur si on a qu’un seul échantillon & risque de crash + incompatibilité avec MLflow donc on ajoute cpu
-            labels = self.label_encoder.inverse_transform(preds)
-            return labels.tolist()
-        except Exception as e:
-            print(f"[ERROR] Prediction failed: {e}")
-            raise e
+        elif isinstance(model_input, list):
+            texts = model_input
+        elif isinstance(model_input, str):
+            texts = [model_input]
+        else:
+            raise ValueError("Input must be str, list or DataFrame with 'text' column")
+
+        inputs = self.tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            max_length=128,
+            return_tensors="pt"
+        )
+
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            preds = torch.argmax(outputs.logits, dim=1).cpu().numpy()
+
+        labels = self.label_encoder.inverse_transform(preds)
+        return labels.tolist()
+
 
 # -----------------------------
-# LOG MODEL TO MLFLOW (VERSION QUI MARCHE)
+# LOGGING DU MODÈLE (VERSION QUI MARCHE À 100% EN PROD)
 # -----------------------------
 if __name__ == "__main__":
-    try:
-        mlflow.set_tracking_uri("http://localhost:5000")
-        mlflow.set_experiment("Transformer_Models")
+    mlflow.set_tracking_uri("http://localhost:5000")
+    mlflow.set_experiment("Transformer_Models")
 
-        with mlflow.start_run(run_name=RUN_NAME) as run:
-            print(f"[DEBUG] Run ID: {run.info.run_id}")
+    with mlflow.start_run(run_name=RUN_NAME) as run:
+        print(f"[INFO] Run ID: {run.info.run_id}")
 
-            # 1. Créer une instance et la charger manuellement pour infer la signature
-            wrapper = TransformerWrapper()
-            temp_context = PythonModelContext(
-                artifacts={"transformer_model": MODEL_DIR},
-                model_config={}
-            )
-            wrapper.load_context(temp_context)  # ← Charge vraiment le modèle
+        # 1. Créer et charger le wrapper temporairement pour infer la signature
+        wrapper = TransformerWrapper()
+        dummy_context = mlflow.pyfunc.PythonModelContext(
+            artifacts={"transformer_model": MODEL_DIR},
+            model_config={}
+        )
+        wrapper.load_context(dummy_context)
 
-            # 2. Inférer la signature avec le modèle chargé
-            example_input = pd.DataFrame({"text": ["example billing issue with payment"]})
-            example_output = wrapper.predict(None, example_input)
-            signature = mlflow.models.infer_signature(example_input, example_output)
+        # 2. Exemple d'entrée/sortie pour la signature
+        example_input = pd.DataFrame({"text": ["my bill is wrong", "i want to cancel"]})
+        example_output = wrapper.predict(None, example_input)
 
-            # 3. Optionnel : calcul des métriques (tu l’as déjà, c’est bon)
+        # 3. Inférer la signature proprement
+        signature = infer_signature(example_input, example_output)
 
-            # 4. LOG MODEL CORRECTEMENT
-            mlflow.pyfunc.log_model(
-                artifact_path="transformer_model",          
-                python_model=wrapper,                        
-                artifacts={"transformer_model": MODEL_DIR}, 
-                input_example=example_input,
-                signature=signature,
-                registered_model_name="CallCenterTransformer",
-                pip_requirements=[
-                    "torch>=2.0",
-                    "transformers>=4.30",
-                    "scikit-learn",
-                    "joblib",
-                    "pandas",
-                    "numpy"
-                ],
-                # code_paths=[os.path.dirname(__file__)],  # si tu as du code custom dans d'autres fichiers
-            )
+        # 4. LOG avec les bons paramètres
+        mlflow.pyfunc.log_model(
+            artifact_path="transformer_model",
+            python_model=wrapper,
+            artifacts={"transformer_model": MODEL_DIR},
+            signature=signature,
+            input_example=example_input,
+            registered_model_name=MODEL_NAME,
+            pip_requirements=[
+                "torch==2.3.1",                   # Pin exact pour stabilité
+                "transformers==4.42.4",            # Version qui a créé le modèle
+                "scikit-learn>=1.3",
+                "joblib>=1.2",
+                "pandas",
+                "numpy"
+            ],
+            metadata={
+                "model_type": "distilbert",
+                "task": "text-classification",
+                "max_length": 128
+            }
+        )
 
-            print("[SUCCESS] Modèle loggé et chargé correctement dans MLflow")
-            print(f"URI → models:/CallCenterTransformer/{run.info.run_id} ou via version")
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise e
+        print(f"[SUCCESS] Modèle enregistré avec succès !")
+        print(f"→ Utilise : models:/{MODEL_NAME}/latest")
+        print(f"→ Ou version spécifique : models:/{MODEL_NAME}/{run.info.run_id}")

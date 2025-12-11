@@ -48,6 +48,7 @@ services:
       dockerfile: docker/agent_service.Dockerfile
     container_name: agent_service
     ports:
+    
       - "8002:8000"   # accès externe à l'API agent
     environment:
       - TRANSFORMERS_URL=http://localhost:8001
